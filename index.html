@@ -184,7 +184,7 @@ const keyStore={get(){try{return localStorage.getItem('te_key')||''}catch(e){ret
 async function run(fn,...args){
   let r;
   try{r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:keyStore.get(),fn,args})})}
-  catch(e){throw new Error('No connection. Check your internet and try again.')}
+  catch(e){const er=new Error(navigator.onLine===false?'No internet on this phone. Connect and try again.':'Your phone is online, but the Google script did not answer. In Apps Script: Deploy → Manage deployments → Edit → Version: New version, Who has access: Anyone → Deploy.');er.code=navigator.onLine===false?'offline':'script';throw er}
   let j;try{j=await r.json()}catch(e){throw new Error('The server did not answer properly. Is the script deployed with access “Anyone”?')}
   if(!j.ok){if(j.code==='bad_key'){keyStore.clear();setTimeout(viewKey,0)}const er=new Error(j.error||'Something went wrong');er.code=j.code;throw er}
   return j.result;
@@ -703,7 +703,7 @@ async function boot(){
   if(!keyStore.get())return viewKey();
   $('#app').innerHTML='<p class="mute" style="margin-top:24px"><span class="spin"></span> Loading your trips…</p>';
   try{const b=await run('getBoot');S.boot=b;S.profile=b.profile;S.trips=b.trips;render()}
-  catch(e){if(e.code==='bad_key')return;$('#app').innerHTML=`<div class="card empty"><b>Could not start</b><p class="mute">${esc(errMsg(e))}</p><button class="btn line sm" id="retry">Try again</button></div>`;$('#retry').onclick=boot}
+  catch(e){if(e.code==='bad_key')return;$('#app').innerHTML=`<div class="card empty"><b>Could not start</b><p class="mute">${esc(errMsg(e))}</p><button class="btn line sm" id="retry">Try again</button>${e.code==='script'?`<a class="btn line sm" style="margin-top:10px" href="${API}" target="_blank">Test the script link</a><p class="mute" style="margin:8px 0 0">The test link should show one line: “Trip Expenses runs at …”. If it shows a sign-in page, the old app, or an error, the deployment needs the fix above.</p>`:''}</div>`;$('#retry').onclick=boot}
 }
 /* ───────── start ───────── */
 boot();
