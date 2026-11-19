@@ -184,7 +184,7 @@ const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOff
 const dmy=iso=>iso?String(iso).split('-').reverse().join('/'):'';
 const dot=iso=>iso?String(iso).split('-').reverse().join('.'):'';
 const days=(a,b)=>a&&b?Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1:'';
-const API='https://script.google.com/macros/s/AKfycbyqCHTzop-rWJOu5KETK21SLkYh6gNFv9Kb_uPxMBTsiJYLTnqdRoaFMMZ12eaYKk3r/exec';
+const API='https://script.google.com/macros/s/AKfycbzcgwTUz4Fl2NdR4jKIqKH1YG38UYZ-JMYXI011KSUjj8mHFyeIaelEwmwlwKL14N3c/exec';
 const keyStore={get(){try{return localStorage.getItem('te_key')||''}catch(e){return ''}},set(v){try{localStorage.setItem('te_key',v)}catch(e){}},clear(){try{localStorage.removeItem('te_key')}catch(e){}}};
 async function run(fn,...args){
   let r;
