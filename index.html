@@ -535,7 +535,7 @@ async function readBill(d){
   const t=S.trip;
   if(!S.boot.hasKey){setStatus(d,'Bill reading is off. Type the details below.','warn');return}
   setStatus(d,'<span class="spin"></span> Reading the bill…');
-  let r;try{r=await run('readBill',d.photo,t.currency)}catch(e){r={ok:false,error:errMsg(e)}}
+  let r;try{r=await run('readBill',d.photo,t.currency)}catch(e){r={ok:false,error:e.code==='script'||e.code==='offline'?'The bill reader took too long to answer. Tap Read again, or type the details.':errMsg(e)}}
   if(S.draft!==d)return;
   if(!r.ok){setStatus(d,esc(r.error)+(d.photo?' <button class="btn line sm" id="reread" style="margin-top:8px">Read again</button>':''),'warn');const rr=$('#reread');if(rr)rr.onclick=()=>readBill(d);return}
   if(r.amount)d.amount=r.amount;

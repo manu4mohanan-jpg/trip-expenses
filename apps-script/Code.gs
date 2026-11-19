@@ -244,7 +244,7 @@ function gemini_(parts, schema) {
   }
   // Google busy (503 / 500 / 429): wait and retry, then try a lighter model once.
   const busy = c => c === 503 || c === 500 || c === 429;
-  for (let i = 0; i < 3 && busy(res.getResponseCode()); i++) { Utilities.sleep(1500 * (i + 1)); res = call(model); }
+  for (let i = 0; i < 2 && busy(res.getResponseCode()); i++) { Utilities.sleep(1000 * (i + 1)); res = call(model); }
   if (busy(res.getResponseCode())) {
     const lite = /lite/.test(model) ? 'gemini-flash-latest' : (model === 'gemini-flash-latest' ? 'gemini-flash-lite-latest' : model + '-lite');
     const r2 = call(lite);
