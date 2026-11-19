@@ -705,6 +705,10 @@ async function boot(){
   try{const b=await run('getBoot');S.boot=b;S.profile=b.profile;S.trips=b.trips;render()}
   catch(e){if(e.code==='bad_key')return;$('#app').innerHTML=`<div class="card empty"><b>Could not start</b><p class="mute">${esc(errMsg(e))}</p><button class="btn line sm" id="retry">Try again</button>${e.code==='script'?`<a class="btn line sm" style="margin-top:10px" href="${API}" target="_blank">Test the script link</a><p class="mute" style="margin:8px 0 0">The test link should show one line: “Trip Expenses runs at …”. If it shows a sign-in page, the old app, or an error, the deployment needs the fix above.</p>`:''}</div>`;$('#retry').onclick=boot}
 }
+/* ───────── Android app: back button follows the app's own back arrow ───────── */
+(()=>{const C=window.Capacitor;const App=C&&C.Plugins&&C.Plugins.App;if(!App)return;
+  App.addListener('backButton',()=>{if($('#modal').style.display==='flex'){if(!$('#modal').dataset.lock)closeModal();return}
+    const b=$('#back');if(b&&b.style.visibility!=='hidden'&&b.onclick)b.onclick();else App.minimizeApp()})})();
 /* ───────── start ───────── */
 boot();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});

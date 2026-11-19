@@ -1,0 +1,75 @@
+name: Build Android app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Keep Gradle between builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle') }}
+          restore-keys: gradle-
+
+      - name: Install
+        run: npm ci
+
+      - name: Build the app screens
+        run: npm run build:web
+
+      - name: Copy into the Android project
+        run: npx cap sync android
+
+      - name: Build the APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          for i in 1 2 3 4; do
+            ./gradlew assembleDebug --no-daemon --stacktrace && exit 0
+            echo "Attempt $i failed, retrying in 45 s"; sleep 45
+          done
+          exit 1
+
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "Trip-Expenses-${BUILD_NUMBER}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Trip-Expenses-${{ github.run_number }}
+          path: Trip-Expenses-*.apk
+
+      - name: Publish a download link
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Trip Expenses ${{ github.run_number }}
+          prerelease: true
+          files: Trip-Expenses-*.apk
+          body: |
+            Trip Expenses Android app, build ${{ github.run_number }}.
+            Install: download the APK on your phone, open it, and allow "install unknown apps" when asked.
+            Your trips stay in your Google account, so updating or reinstalling never loses data.

@@ -1,0 +1,19 @@
+{
+  "name": "trip-expenses",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Trip Expenses as an Android app",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs",
+    "sync": "npm run build:web && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "7.6.10",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/core": "7.6.10",
+    "@capacitor/status-bar": "7.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.6.10"
+  }
+}
