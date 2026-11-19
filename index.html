@@ -134,6 +134,11 @@ tr.tot td{font-weight:600;border-bottom:0;border-top:1.5px solid var(--mute)}
 .cnt div{background:var(--soft);border-radius:16px;padding:10px 12px}.cnt b{display:block;font-size:20px;font-weight:600}
 .bar{padding-top:max(12px,env(safe-area-inset-top))}
 .wrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+:root{--kb:0px}
+.wrap{padding-bottom:calc(130px + var(--kb))}
+html.kb-open .fab{display:none}
+html.kb-open #toast{bottom:calc(var(--kb) + 16px)}
+#modal .box{padding-bottom:calc(max(22px,env(safe-area-inset-bottom)) + var(--kb))}
 </style>
 </head>
 <body>
@@ -710,6 +715,15 @@ async function boot(){
 (()=>{const C=window.Capacitor;const App=C&&C.Plugins&&C.Plugins.App;if(!App)return;
   App.addListener('backButton',()=>{if($('#modal').style.display==='flex'){if(!$('#modal').dataset.lock)closeModal();return}
     const b=$('#back');if(b&&b.style.visibility!=='hidden'&&b.onclick)b.onclick();else App.minimizeApp()})})();
+/* ───────── keyboard: keep the field you're typing in above the on-screen keyboard ───────── */
+(()=>{const root=document.documentElement;let h0=0;
+  const show=()=>{const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.scrollIntoView)a.scrollIntoView({block:'center',behavior:'smooth'})};
+  const set=h=>{h=Math.max(0,Math.round(h||0));if(h===h0)return;h0=h;root.style.setProperty('--kb',h+'px');root.classList.toggle('kb-open',h>0);if(h>0){setTimeout(show,60);setTimeout(show,320)}};
+  const K=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Keyboard;
+  if(K&&K.addListener){K.addListener('keyboardWillShow',i=>set(i&&i.keyboardHeight));K.addListener('keyboardDidShow',i=>set(i&&i.keyboardHeight));K.addListener('keyboardWillHide',()=>set(0));K.addListener('keyboardDidHide',()=>set(0))}
+  if(window.visualViewport){const vv=window.visualViewport;const f=()=>{const d=window.innerHeight-vv.height-vv.offsetTop;if(!(K&&K.addListener))set(d>80?d:0)};vv.addEventListener('resize',f)}
+  document.addEventListener('focusin',e=>{if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))setTimeout(show,h0>0?60:350)});
+})();
 /* ───────── start ───────── */
 boot();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});

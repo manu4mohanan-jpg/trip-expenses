@@ -11,6 +11,7 @@
     "@capacitor/android": "7.6.10",
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "7.6.10",
+    "@capacitor/keyboard": "^7.0.4",
     "@capacitor/status-bar": "7.0.6"
   },
   "devDependencies": {
