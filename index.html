@@ -504,6 +504,7 @@ function viewBill(){
   if(d.needRate){d.needRate=false;curChanged()}
 
   const onFile=f=>useFile(d,f);
+  const rr=$('#reread');if(rr)rr.onclick=()=>readBill(d);
   const sk=$('#bSkip');if(sk)sk.onclick=nextInQueue;
   $('#cam').onclick=()=>pickPhoto('cam',onFile);
   $('#gal').onclick=()=>pickPhoto('gal',onFile);
@@ -531,7 +532,7 @@ async function readBill(d){
   setStatus(d,'<span class="spin"></span> Reading the bill…');
   let r;try{r=await run('readBill',d.photo,t.currency)}catch(e){r={ok:false,error:errMsg(e)}}
   if(S.draft!==d)return;
-  if(!r.ok){setStatus(d,esc(r.error),'warn');return}
+  if(!r.ok){setStatus(d,esc(r.error)+(d.photo?' <button class="btn line sm" id="reread" style="margin-top:8px">Read again</button>':''),'warn');const rr=$('#reread');if(rr)rr.onclick=()=>readBill(d);return}
   if(r.amount)d.amount=r.amount;
   if(r.currency)d.currency=String(r.currency).toUpperCase().slice(0,3);
   if(d.currency===t.currency)d.rate=t.rate;else if(d.currency==='INR')d.rate=1;else d.needRate=true;

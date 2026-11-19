@@ -240,7 +240,15 @@ function gemini_(parts, schema) {
   let res = call(model);
   if (res.getResponseCode() === 404 || res.getResponseCode() === 400 && /not found|not supported/i.test(res.getContentText())) {
     const found = findModel_(key, model);
-    if (found) { props_().setProperty('GEMINI_MODEL_AUTO', found); props_().deleteProperty('GEMINI_MODEL'); res = call(found); }
+    if (found) { props_().setProperty('GEMINI_MODEL_AUTO', found); props_().deleteProperty('GEMINI_MODEL'); model = found; res = call(found); }
+  }
+  // Google busy (503 / 500 / 429): wait and retry, then try a lighter model once.
+  const busy = c => c === 503 || c === 500 || c === 429;
+  for (let i = 0; i < 3 && busy(res.getResponseCode()); i++) { Utilities.sleep(1500 * (i + 1)); res = call(model); }
+  if (busy(res.getResponseCode())) {
+    const lite = /lite/.test(model) ? 'gemini-flash-latest' : (model === 'gemini-flash-latest' ? 'gemini-flash-lite-latest' : model + '-lite');
+    const r2 = call(lite);
+    if (r2.getResponseCode() === 200) res = r2;
   }
   if (res.getResponseCode() !== 200) throw new Error('HTTP_' + res.getResponseCode());
   const j = JSON.parse(res.getContentText());
@@ -297,9 +305,10 @@ function readBill(dataUrl, currency) {
   } catch (e) {
     const c = String(e.message || e);
     if (c === 'NO_KEY') return { ok: false, error: 'Bill reading is off (no GEMINI_API_KEY). Type the details.' };
-    if (c === 'HTTP_429') return { ok: false, error: 'Bill reading is busy (free limit reached). Wait a minute, or type the details.' };
+    if (c === 'HTTP_429') return { ok: false, retry: true, error: 'Bill reading has hit the free limit for now. Wait a minute and tap Read again, or type the details.' };
+    if (c === 'HTTP_503' || c === 'HTTP_500') return { ok: false, retry: true, error: 'Google’s bill reader is busy right now. Tap Read again in a few seconds, or type the details.' };
     if (c === 'HTTP_403' || c === 'HTTP_401') return { ok: false, error: 'Your Gemini key was refused. Check GEMINI_API_KEY in Script properties.' };
-    return { ok: false, error: 'Could not read the bill (' + c.replace('HTTP_', '') + '). Type the details.' };
+    return { ok: false, retry: true, error: 'Could not read the bill (' + c.replace('HTTP_', '') + '). Tap Read again, or type the details.' };
   }
 }
 
