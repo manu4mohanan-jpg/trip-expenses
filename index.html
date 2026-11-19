@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trip Expenses">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Trip Expenses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE  : calm, premium wallet at night — few colours, big numbers, quiet labels.
+   IDEA   : a dark banking app: an emerald balance card on near-black, everything else in soft graphite tiles.
+   PICTURE: the emerald trip card with the live total is the first screen; graphite tiles and lists follow.
+   COLOUR : near-black #0b0b0b, graphite #171717 / #1f1f1f, emerald #1e7a58, white pills for the second action.
+   TYPE   : Outfit, lowercase section labels, 4 sizes. LAYOUT: unchanged single column, rounded 26px cards, floating emerald action. */
+:root{color-scheme:dark;
+  --bg:#0b0b0b;--card:#171717;--ink:#f3f3f1;--mute:#8b8b88;--line:#262626;--soft:#202020;--teal:#1e7a58;--teal2:#26956c;--lime:#ffffff;
+  --red:#ff7a6e;--ok:#5fd39a;--warn:#f2b456;--shadow:none;
+  --t-Hotel:#2b1d1b;--c-Hotel:#ff8a75;--t-Food:#2b2418;--c-Food:#f3b25b;
+  --t-Transport:#17222f;--c-Transport:#6fa8ff;--t-Other:#16271e;--c-Other:#5fd39a;
+  --t-Personal:#231c30;--c-Personal:#b694ff}
+:root[data-theme=light],:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Outfit",system-ui,sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased}
+body::before{content:none}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:560px;margin:0 auto;padding:4px 16px 130px}
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:12px 16px;max-width:560px;margin:0 auto;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.bar h1{flex:1;margin:0;font-size:17px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon{width:44px;height:44px;border:0;background:var(--card);border-radius:14px;font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center;color:var(--ink)}
+.icon:focus-visible,.btn:focus-visible,.chip:focus-visible,.tab:focus-visible,.daychip:focus-visible{outline:3px solid var(--c-Transport);outline-offset:2px}
+.hello{margin:6px 0 2px;font-size:clamp(24px,6.5vw,30px);font-weight:600;line-height:1.1;letter-spacing:-.01em}
+h2{font-size:19px;font-weight:600;margin:28px 0 10px;text-transform:lowercase}
+.mute{color:var(--mute);font-size:14px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 18px;border-radius:999px;border:0;background:var(--teal);color:#fff;font-weight:600;cursor:pointer;text-decoration:none}
+.btn.red{background:var(--teal);color:#fff}
+.btn.lime{background:#fff;color:#0b0b0b}
+.btn.line{background:var(--soft);color:var(--ink)}
+.btn.sm{min-height:44px;font-size:14px;padding:8px 14px}
+.btn.danger{background:transparent;color:var(--red);border:1.5px solid #3a2522}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn svg{flex:none}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+label.f{display:block;margin-top:14px;font-size:13px;font-weight:600;color:var(--mute)}
+input.i,select.i,textarea.i{display:block;width:100%;margin-top:6px;min-height:50px;padding:12px 14px;border:1.5px solid var(--line);border-radius:16px;background:var(--card);font-size:16px;color-scheme:dark}
+input.i:focus,select.i:focus{outline:2px solid var(--teal2);border-color:transparent}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:6px 14px 6px 6px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font-weight:600;font-size:15px;cursor:pointer}
+.chip.plain{padding:6px 16px}
+.chip.on{border-color:#fff;background:#fff;color:#0b0b0b}
+.chip.on .tile{filter:none}
+.card{background:var(--card);border-radius:26px;padding:16px;margin-top:12px}
+.tile{width:36px;height:36px;flex:none;border-radius:11px;display:grid;place-items:center;background:var(--soft);color:var(--mute)}
+.tile.lg{width:44px;height:44px;border-radius:14px}
+.tile.Hotel{background:var(--t-Hotel);color:var(--c-Hotel)}.tile.Food{background:var(--t-Food);color:var(--c-Food)}
+.tile.Transport{background:var(--t-Transport);color:var(--c-Transport)}.tile.Other{background:var(--t-Other);color:var(--c-Other)}
+.tile.Personal{background:var(--t-Personal);color:var(--c-Personal)}
+.trip{display:block;width:100%;padding:0;border:0;text-align:left;cursor:pointer;overflow:hidden}
+.trip .top{padding:18px 16px;background:linear-gradient(140deg,#1e7a58,#155c43);color:#fff}.trip .top .mute{color:rgba(255,255,255,.7)}
+.trip .code{font-size:30px;font-weight:700;letter-spacing:.02em;line-height:1}
+.trip .bot{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px 16px}
+.money{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;background:#0b0b0b;color:#fff}
+.tag.ok{background:#fff;color:#0b0b0b}
+.strip{background:linear-gradient(150deg,#22845f,#17654a);color:#fff;border-radius:28px;padding:20px 18px;margin-top:8px}
+.strip .lbl{font-size:14px;opacity:.75;text-transform:lowercase}
+.strip .tot{font-size:clamp(34px,10vw,46px);font-weight:600;line-height:1.1;letter-spacing:-.01em}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}
+.stats b{display:block;font-size:17px;font-weight:600}
+.stats span{font-size:12px;opacity:.75}
+.stats>div{background:rgba(0,0,0,.28);border-radius:18px;padding:10px 12px}.stats .lime{color:#fff}
+.tabs{display:flex;gap:4px;padding:5px;margin-top:16px;background:var(--card);border-radius:999px}
+.tab{flex:1;min-height:42px;border:0;border-radius:999px;background:transparent;font-weight:500;font-size:15px;color:var(--mute);cursor:pointer;text-transform:lowercase}
+.tab.on{background:#fff;color:#0b0b0b}
+.days{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;margin:12px -2px 0;scrollbar-width:none}
+.days::-webkit-scrollbar{display:none}
+.daychip{flex:none;width:64px;border:0;border-radius:18px;background:var(--card);padding:8px 0 0;text-align:center;cursor:pointer;overflow:hidden;color:var(--ink)}
+.daychip .w{font-size:12px;color:var(--mute)}.daychip .d{font-size:20px;font-weight:700;line-height:1.1}.daychip .m{font-size:12px;color:var(--mute)}
+.daychip .a{display:block;margin-top:6px;padding:4px 0;font-size:11px;font-weight:600;background:var(--soft);color:var(--ink)}
+.daychip.on{background:var(--teal);color:#fff}.daychip.on .a{background:rgba(0,0,0,.25);color:#fff}.daychip.on .w,.daychip.on .m{color:rgba(255,255,255,.75)}
+.daychip.all{display:grid;place-items:center;font-weight:700}
+.list .it{display:flex;gap:12px;align-items:center;width:100%;padding:11px 0;border:0;border-top:1px solid var(--line);background:none;text-align:left;cursor:pointer}
+.list .it:first-child{border-top:0}
+.it .m{flex:1}
+.it .nm{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .sub{display:block;font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .amt{text-align:right}
+.it .amt b{display:block;font-weight:700}
+.thumb{width:44px;height:44px;flex:none;border-radius:14px;background:var(--soft) center/cover no-repeat;position:relative}
+.thumb .tile{position:absolute;right:-4px;bottom:-4px;width:22px;height:22px;border-radius:7px;border:2px solid var(--card)}
+.thumb .tile svg{width:12px;height:12px}
+.bal{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:12px}
+.bal div{background:var(--card);border-radius:22px;padding:12px 14px}
+.bal b{display:block;font-size:17px}
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom));width:min(528px,calc(100% - 32px));z-index:6;border-radius:22px;background:var(--teal2);box-shadow:0 12px 30px rgba(0,0,0,.6)}
+.photo{position:relative;border-radius:26px;overflow:hidden;background:var(--card);min-height:180px;display:grid;place-items:center;margin-top:8px}
+.photo img{display:block;width:100%;max-height:50vh;object-fit:contain;background:#0b1114}
+.pick{display:grid;gap:10px;padding:22px 18px;width:100%;text-align:center}
+.status{margin-top:10px;font-size:14px;padding:11px 14px;border-radius:16px;background:var(--card)}
+.status.ok{color:var(--ok)}.status.warn{color:var(--warn)}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px}
+.inr{margin-top:6px;font-size:14px;color:var(--mute)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.tot td{font-weight:600;border-bottom:0;border-top:1.5px solid var(--mute)}
+.scroll{overflow-x:auto}
+.form-title{font-size:13px;font-weight:600;color:var(--mute);margin:22px 0 0}
+.pct{font-size:13px;color:var(--mute);width:42px;text-align:right}
+.bar2{height:6px;border-radius:3px;background:var(--soft);margin-top:6px;overflow:hidden}.bar2 i{display:block;height:100%;border-radius:3px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:#fff;color:#0b0b0b;padding:12px 18px;border-radius:999px;font-size:14px;font-weight:500;max-width:90%;z-index:20;display:none}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:30}
+#modal .box{background:#141414;width:100%;max-width:560px;border-radius:28px 28px 0 0;padding:22px 16px max(22px,env(safe-area-inset-bottom))}
+.spin{width:18px;height:18px;border:2.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .8s linear infinite;display:inline-block;vertical-align:-3px}
+@keyframes s{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.empty{text-align:center;padding:40px 16px}
+.empty b{display:block;font-size:22px;margin-bottom:6px}
+.avatar{width:46px;height:46px;border-radius:16px;border:0;background:var(--teal);color:#fff;font-weight:600;cursor:pointer;flex:none}
+.sel{min-height:40px;padding:6px 10px;border-radius:12px;border:1.5px solid var(--line);background:var(--soft);color:var(--ink);font-size:14px;color-scheme:dark}
+.ck{width:22px;height:22px;accent-color:#26956c;flex:none}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--mute)}
+.pill.ok{background:#16271e;color:var(--ok)}.pill.no{background:#2b1d1b;color:var(--c-Hotel)}
+.cnt{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.cnt div{background:var(--soft);border-radius:16px;padding:10px 12px}.cnt b{display:block;font-size:20px;font-weight:600}
+.bar{padding-top:max(12px,env(safe-area-inset-top))}
+.wrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+</style>
+</head>
+<body>
+<div class="bar"><button class="icon" id="back" aria-label="Back" style="visibility:hidden"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button><h1 id="title">Trip Expenses</h1><button class="icon" id="more" aria-label="Trip details" style="visibility:hidden"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div>
+<div class="wrap" id="app"><p class="mute" style="margin-top:24px"><span class="spin"></span> Loading your trips…</p></div>
+<div id="fabSlot"></div>
+<div id="toast" role="status"></div>
+<div id="modal"><div class="box" id="modalBox"></div></div>
+<input id="camIn" type="file" accept="image/*" capture="environment" class="vh">
+<input id="galIn" type="file" accept="image/*" class="vh">
+<input id="multiIn" type="file" accept="image/*" multiple class="vh">
+<input id="pdfIn" type="file" accept="application/pdf,.pdf" class="vh">
+<script>
+{
+/* ───────── reference data ───────── */
+const COUNTRIES=[["United Kingdom","GBR","GBP"],["United States","USA","USD"],["Germany","DEU","EUR"],["France","FRA","EUR"],["Italy","ITA","EUR"],["Spain","ESP","EUR"],["Netherlands","NLD","EUR"],["Belgium","BEL","EUR"],["Austria","AUT","EUR"],["Portugal","PRT","EUR"],["Ireland","IRL","EUR"],["Greece","GRC","EUR"],["Finland","FIN","EUR"],["Switzerland","CHE","CHF"],["Sweden","SWE","SEK"],["Norway","NOR","NOK"],["Denmark","DNK","DKK"],["Poland","POL","PLN"],["Czech Republic","CZE","CZK"],["Hungary","HUN","HUF"],["Turkey","TUR","TRY"],["United Arab Emirates","ARE","AED"],["Saudi Arabia","SAU","SAR"],["Qatar","QAT","QAR"],["Oman","OMN","OMR"],["Bahrain","BHR","BHD"],["Kuwait","KWT","KWD"],["Japan","JPN","JPY"],["China","CHN","CNY"],["South Korea","KOR","KRW"],["Taiwan","TWN","TWD"],["Hong Kong","HKG","HKD"],["Singapore","SGP","SGD"],["Malaysia","MYS","MYR"],["Thailand","THA","THB"],["Indonesia","IDN","IDR"],["Vietnam","VNM","VND"],["Philippines","PHL","PHP"],["Sri Lanka","LKA","LKR"],["Nepal","NPL","NPR"],["Bangladesh","BGD","BDT"],["Maldives","MDV","MVR"],["Australia","AUS","AUD"],["New Zealand","NZL","NZD"],["Canada","CAN","CAD"],["Mexico","MEX","MXN"],["Brazil","BRA","BRL"],["Argentina","ARG","ARS"],["Colombia","COL","COP"],["South Africa","ZAF","ZAR"],["Egypt","EGY","EGP"],["Kenya","KEN","KES"],["Nigeria","NGA","NGN"],["Morocco","MAR","MAD"],["Israel","ISR","ILS"],["Russia","RUS","RUB"],["Kazakhstan","KAZ","KZT"]];
+const CUR_NAMES={GBP:'POUNDS',EUR:'EUROS',USD:'US DOLLARS',JPY:'YEN',AED:'DIRHAMS',SGD:'SINGAPORE DOLLARS',CHF:'SWISS FRANCS',AUD:'AUSTRALIAN DOLLARS',CNY:'YUAN',THB:'BAHT',IDR:'RUPIAH',MYR:'RINGGIT',CAD:'CANADIAN DOLLARS',KRW:'WON',VND:'DONG',SAR:'RIYALS',QAR:'RIYALS',NZD:'NZ DOLLARS',SEK:'KRONA',NOK:'KRONE',DKK:'KRONE'};
+const SECS=[{k:'Hotel',label:'Hotel'},{k:'Food',label:'Food'},{k:'Transport',label:'Taxi / Train / Bus'},{k:'Other',label:'Other'}];
+const PAYS=[{k:'Card',label:'Forex card'},{k:'Cash',label:'Forex cash'},{k:'Personal',label:'Personal'}];
+const secLabel=k=>(SECS.find(s=>s.k===k)||SECS[3]).label;
+const payLabel=k=>(PAYS.find(p=>p.k===k)||{label:k}).label;
+
+/* icons */
+const IC={Hotel:'<path d="M3 19v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 15h18M7 10V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/>',
+ Food:'<path d="M7 3v18M5 3v5a2 2 0 0 0 4 0V3M17 21V3c-2 1.5-3 4-3 7h3"/>',
+ Transport:'<path d="M5 17V10l2-5h10l2 5v7M5 17h14M5 17v2M19 17v2M5 10h14M8 14h.01M16 14h.01"/>',
+ Other:'<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 7.5h.01"/>',
+ Personal:'<path d="M3 7a2 2 0 0 1 2-2h12v4M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2zM16 14h.01"/>',
+ cam:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+ img:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',doc:'<path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/>',file:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+ sheet:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>',refresh:'<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>'};
+const ico=(k,sz=18)=>`<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]||''}</svg>`;
+const tileKey=b=>b.payment==='Personal'?'Personal':(SECS.some(s=>s.k===b.category)?b.category:'Other');
+const tile=(k,cls='')=>`<span class="tile ${k} ${cls}">${ico(k,cls?20:18)}</span>`;
+
+/* ───────── helpers ───────── */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const n2=n=>(Number(n)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const r2=n=>Math.round((Number(n)||0)*100)/100;
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+const dmy=iso=>iso?String(iso).split('-').reverse().join('/'):'';
+const dot=iso=>iso?String(iso).split('-').reverse().join('.'):'';
+const days=(a,b)=>a&&b?Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1:'';
+const API='https://script.google.com/macros/s/AKfycbyqCHTzop-rWJOu5KETK21SLkYh6gNFv9Kb_uPxMBTsiJYLTnqdRoaFMMZ12eaYKk3r/exec';
+const keyStore={get(){try{return localStorage.getItem('te_key')||''}catch(e){return ''}},set(v){try{localStorage.setItem('te_key',v)}catch(e){}},clear(){try{localStorage.removeItem('te_key')}catch(e){}}};
+async function run(fn,...args){
+  let r;
+  try{r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:keyStore.get(),fn,args})})}
+  catch(e){throw new Error('No connection. Check your internet and try again.')}
+  let j;try{j=await r.json()}catch(e){throw new Error('The server did not answer properly. Is the script deployed with access “Anyone”?')}
+  if(!j.ok){if(j.code==='bad_key'){keyStore.clear();setTimeout(viewKey,0)}const er=new Error(j.error||'Something went wrong');er.code=j.code;throw er}
+  return j.result;
+}
+const errMsg=e=>(e&&e.message)?e.message.replace(/^Exception: /,''):String(e);
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3200)}
+function modal(html){$('#modalBox').innerHTML=html;$('#modal').style.display='flex'}
+function closeModal(){$('#modal').style.display='none';$('#modalBox').innerHTML=''}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&!$('#modal').dataset.lock)closeModal()});
+function busy(msg){$('#modal').dataset.lock='1';modal(`<p style="margin:0"><span class="spin"></span> <b>${esc(msg)}</b></p>`)}
+function done(){delete $('#modal').dataset.lock;closeModal()}
+function ask(msg,okLabel,danger){return new Promise(res=>{modal(`<p style="margin:0 0 16px;font-weight:600">${esc(msg)}</p><div class="row"><button class="btn line" id="mNo">Cancel</button><button class="btn ${danger?'lime':''}" id="mYes">${esc(okLabel||'OK')}</button></div>`);$('#mNo').onclick=()=>{closeModal();res(false)};$('#mYes').onclick=()=>{closeModal();res(true)}})}
+function head(title,back,more){$('#title').textContent=title;const b=$('#back');b.style.visibility=back?'visible':'hidden';b.onclick=back||null;const m=$('#more');m.style.visibility=more?'visible':'hidden';m.onclick=more||null;window.scrollTo(0,0)}
+function fab(html){$('#fabSlot').innerHTML=html||''}
+function compress(file,max,q){return new Promise((res,rej)=>{const u=URL.createObjectURL(file),img=new Image();img.onload=()=>{const s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',q))};img.onerror=()=>rej(new Error('Could not open that image'));img.src=u})}
+function pickMany(cb){const inp=$('#multiIn');inp.value='';inp.onchange=()=>{if(inp.files.length)cb(Array.from(inp.files))};inp.click()}
+function pickPhoto(which,cb){const inp=which==='cam'?$('#camIn'):$('#galIn');inp.value='';inp.onchange=()=>{const f=inp.files[0];if(f)cb(f)};inp.click()}
+
+/* ───────── state ───────── */
+const S={queue:[],qTotal:0,trips:[],profile:{},trip:null,bills:[],draft:null,view:'home',tab:'bills',day:null,boot:null,photoCache:{}};
+function setTrip(r){S.trip=r.trip;S.bills=(r.bills||[]).slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));const i=S.trips.findIndex(t=>t.id===r.trip.id);if(i>=0)S.trips[i]=r.trip;else S.trips.unshift(r.trip)}
+
+/* ───────── maths ───────── */
+function calc(trip,bills){
+  const t={sec:{Hotel:{amt:0,inr:0,n:0},Food:{amt:0,inr:0,n:0},Transport:{amt:0,inr:0,n:0},Other:{amt:0,inr:0,n:0}},oop:{inr:0,n:0},pay:{Card:0,Cash:0,Personal:0},cardLocal:0,cashLocal:0,total:0};
+  bills.forEach(b=>{const inr=r2(b.amount*b.rate);
+    if(b.payment==='Personal'){t.oop.inr+=inr;t.oop.n++}
+    else{const s=t.sec[b.category]||t.sec.Other;s.amt+=b.currency===trip.currency?b.amount:r2(inr/(trip.rate||1));s.inr+=inr;s.n++}
+    t.pay[b.payment]=(t.pay[b.payment]||0)+inr;
+    if(b.payment==='Card'&&b.currency===trip.currency)t.cardLocal+=b.amount;
+    if(b.payment==='Cash'&&b.currency===trip.currency)t.cashLocal+=b.amount;
+    t.total+=inr});
+  const cashRate=Number(trip.cashRate)||Number(trip.rate);
+  t.cardLeft=r2((Number(trip.cardLoad)||0)-t.cardLocal);t.cashLeft=r2((Number(trip.cashTaken)||0)-t.cashLocal);
+  t.imprest=r2((Number(trip.cardLoad)||0)*trip.rate+(Number(trip.cashTaken)||0)*cashRate);
+  t.returned=r2((Number(trip.cardReturned)||0)*trip.rate+(Number(trip.cashReturned)||0)*cashRate);
+  t.total=r2(t.total);t.due=r2(t.imprest-t.total-t.returned);
+  return t;
+}
+
+/* ───────── router ───────── */
+function render(){({home:viewHome,trip:viewTrip,tripForm:viewTripForm,bill:viewBill,statement:viewStatement,profile:viewProfile,card:viewCard}[S.view]||viewHome)()}
+function go(v){S.view=v;render()}
+
+/* ───────── home ───────── */
+function viewHome(){
+  head('',null,null);
+  const p=S.profile,trips=S.trips;
+  const first=(p.empName||'').split(' ')[0];
+  const hr=new Date().getHours();const greet=hr<12?'good morning':hr<17?'good afternoon':'good evening';
+  const initials=(p.empName||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const active=trips.filter(t=>t.status!=='Submitted'),sub=trips.filter(t=>t.status==='Submitted');
+  const card=t=>`
+      <button class="card trip" data-id="${esc(t.id)}">
+        <div class="top">
+          <div class="row" style="align-items:flex-start"><span><span class="mute" style="display:block">${esc(t.country)}</span><span class="code">${esc(t.code||t.currency)}</span></span>
+          <span style="flex:none;text-align:right"><span class="tag ${t.status==='Submitted'?'ok':''}">${t.status==='Submitted'?'submitted':'active'}</span></span></div>
+          <div style="margin-top:8px;font-weight:600">${esc(t.name)}</div>
+          <div class="mute">${dmy(t.start)}${t.end?' – '+dmy(t.end):''}${t.cities?' · '+esc(t.cities):''}</div>
+        </div>
+        <div class="bot"><span class="money" style="font-size:19px;font-weight:600">₹ ${n2(t.totalInr||0)}</span><span class="mute">${t.billCount||0} bills · ${esc(t.currency)}</span></div>
+      </button>`;
+  $('#app').innerHTML=`
+    <div class="row" style="align-items:center;margin-top:4px">
+      <div><div class="mute" style="font-size:15px">${greet},</div><div class="hello">${first?esc(first):'traveller'}</div></div>
+      <button class="avatar" id="prof" aria-label="Your details" style="flex:none">${esc(initials)}</button>
+    </div>
+    ${!p.empName?`<div class="card"><b>Add your name and employee number</b><p class="mute" style="margin:4px 0 10px">They go on the statement header.</p><button class="btn line sm" id="setProf">Add details</button></div>`:''}
+    ${trips.length?`${active.length?'<h2>current trips</h2>'+active.map(card).join(''):''}${sub.length?'<h2>submitted</h2>'+sub.map(card).join(''):''}`
+      :`<div class="card empty"><b>No trips yet</b><p class="mute" style="margin:0">Start a trip when you land. Snap each bill as you go, and submit the statement and PDF at the end.</p></div>`}
+    <div class="row" style="margin-top:22px"><a class="btn line sm" href="${esc(S.boot.registerUrl)}" target="_blank">${ico('sheet')} Global register</a><a class="btn line sm" href="${esc(S.boot.folderUrl)}" target="_blank">Drive folder</a></div>
+    ${S.boot.hasKey?'':'<div class="status warn">Bill reading is off. Add GEMINI_API_KEY in the script’s properties to switch it on.</div>'}`;
+  fab(`<button class="btn fab" id="newTrip">${ico('plus',20)} Start a new trip</button>`);
+  $('#newTrip').onclick=()=>{S.trip=null;S.bills=[];go('tripForm')};
+  $('#prof').onclick=()=>go('profile');
+  const sp=$('#setProf');if(sp)sp.onclick=()=>go('profile');
+  document.querySelectorAll('.trip').forEach(el=>el.onclick=()=>openTrip(el.dataset.id));
+}
+
+function viewProfile(){
+  head('your details',()=>go('home'));fab('');
+  const p=S.profile;
+  $('#app').innerHTML=`
+    <label class="f">Name of the employee<input class="i" id="pName" value="${esc(p.empName||'')}" autocomplete="name"></label>
+    <label class="f">Employee number<input class="i" id="pNo" value="${esc(p.empNo||'')}"></label>
+    <div style="height:18px"></div><button class="btn" id="pSave">Save</button>
+    <div style="height:30px"></div><button class="btn danger sm" id="pForget">Forget app key on this phone</button>`;
+  $('#pForget').onclick=async()=>{if(!await ask('Remove the app key from this phone? You will need to enter it again.','Remove',true))return;keyStore.clear();viewKey()};
+  $('#pSave').onclick=async()=>{busy('Saving…');try{S.profile=await run('saveProfile',{empName:$('#pName').value.trim(),empNo:$('#pNo').value.trim()});done();toast('Saved');go('home')}catch(e){done();toast(errMsg(e))}};
+}
+
+async function openTrip(id){
+  busy('Opening trip…');
+  try{const r=await run('getTrip',id);setTrip(r);done();S.tab='bills';S.day=null;go('trip')}catch(e){done();toast(errMsg(e))}
+}
+
+/* ───────── trip form (create / edit, incl. currency returned) ───────── */
+function viewTripForm(){
+  const t=S.trip||{};const editing=!!S.trip;
+  head(editing?'trip details':'new trip',()=>editing?go('trip'):go('home'));fab('');
+  const ci=COUNTRIES.findIndex(c=>c[0]===t.country);
+  const other=editing&&ci<0;
+  const tt=editing?calc(t,S.bills):null;
+  $('#app').innerHTML=`
+    <label class="f">Trip name<input class="i" id="fName" value="${esc(t.name||'')}" placeholder="e.g. EICMA Milan"></label>
+    <label class="f">Country<select class="i" id="fCountry"><option value="">Select country</option>${COUNTRIES.map((c,i)=>`<option value="${i}" ${i===ci?'selected':''}>${esc(c[0])}</option>`).join('')}<option value="other" ${other?'selected':''}>Other…</option></select></label>
+    <div id="otherBox" style="display:${other?'block':'none'}"><div class="grid2">
+      <label class="f">Country name<input class="i" id="fCountryOther" value="${other?esc(t.country):''}"></label>
+      <label class="f">Country code<input class="i" id="fCode" maxlength="3" value="${other?esc(t.code||''):''}" placeholder="e.g. ISL" style="text-transform:uppercase"></label></div></div>
+    <div class="grid2">
+      <label class="f">Currency<input class="i" id="fCur" maxlength="3" value="${esc(t.currency||'')}" style="text-transform:uppercase" ${editing&&S.bills.length?'readonly':''}></label>
+      <label class="f">₹ per 1 <span id="curLbl">${esc(t.currency||'unit')}</span><input class="i" id="fRate" type="number" inputmode="decimal" step="any" value="${esc(t.rate||'')}"></label>
+    </div>
+    <div class="row" style="align-items:center;margin-top:8px"><span class="mute" id="rateNote">${t.rateSource?esc('Source: '+t.rateSource):'Pick a country to fetch the live rate.'}</span><button class="btn line sm" id="rateLive" style="flex:none;width:auto">${ico('refresh')} Live rate</button></div>
+    <label class="f">Cities<input class="i" id="fCities" value="${esc(t.cities||'')}" placeholder="London, Birmingham"></label>
+    <div class="grid2">
+      <label class="f">Start<input class="i" id="fStart" type="date" value="${esc(t.start||today())}"></label>
+      <label class="f">End<input class="i" id="fEnd" type="date" value="${esc(t.end||'')}"></label>
+    </div>
+    <label class="f">Purpose<input class="i" id="fPurpose" value="${esc(t.purpose||'')}" placeholder="Client visit, motor show…"></label>
+    ${editing?'':`<label class="card" style="display:flex;gap:12px;align-items:center;cursor:pointer;padding:14px 16px"><input type="checkbox" id="fPast" style="width:22px;height:22px;accent-color:#26956c;flex:none"><span><b style="display:block;font-weight:600">Past trip, already submitted</b><span class="mute">For keeping records of earlier trips. Pick the real dates and the rate is taken from the start date.</span></span></label>`}
+
+    <p class="form-title">Rate screenshot (e.g. your forex card load slip)</p>
+    <div class="row" style="margin-top:8px;align-items:center">
+      <div class="thumb" id="rateThumb"></div>
+      <button class="btn line sm" id="rateBtn" style="flex:1">${t.rateFileId?'Replace screenshot':'Add rate screenshot'}</button>
+    </div>
+
+    <p class="form-title">Imprest taken (foreign currency)</p>
+    <div class="grid2">
+      <label class="f">Forex card loaded<input class="i" id="fCard" type="number" inputmode="decimal" step="any" value="${esc(t.cardLoad||'')}"></label>
+      <label class="f">Forex cash taken<input class="i" id="fCash" type="number" inputmode="decimal" step="any" value="${esc(t.cashTaken||'')}"></label>
+    </div>
+    <label class="f">Cash rate (₹ per unit, if different)<input class="i" id="fCashRate" type="number" inputmode="decimal" step="any" value="${esc(t.cashRate||'')}" placeholder="Same as trip rate"></label>
+    <label class="f">Air ticket / insurance paid by company (₹)<input class="i" id="fTickets" type="number" inputmode="decimal" step="any" value="${esc(t.tickets||'')}"></label>
+
+    ${editing?`<p class="form-title">End of trip: currency returned</p>
+    <div class="grid2">
+      <label class="f">Card balance<input class="i" id="fCardRet" type="number" inputmode="decimal" step="any" value="${esc(t.cardReturned||'')}"></label>
+      <label class="f">Cash returned<input class="i" id="fCashRet" type="number" inputmode="decimal" step="any" value="${esc(t.cashReturned||'')}"></label>
+    </div>
+    <button class="btn line sm" id="useLeft" style="margin-top:10px">Use app balance: card ${esc(t.currency)} ${n2(tt.cardLeft)} · cash ${n2(tt.cashLeft)}</button>`:''}
+    <div style="height:20px"></div>
+    <button class="btn" id="fSave">${editing?'Save changes':'Create trip'}</button>
+    ${editing?`<div style="height:30px"></div><button class="btn danger sm" id="fDel">Delete this trip</button>`:''}`;
+
+  let rateShot=null,rateSource=t.rateSource||'',autoRate=false;
+  if(editing&&t.rateFileId)loadPhoto(t.rateFileId,u=>{const th=$('#rateThumb');if(th)th.style.backgroundImage=`url('${u}')`});
+  const sel=$('#fCountry');
+  const live=async()=>{const cur=$('#fCur').value.trim().toUpperCase();if(cur.length!==3)return toast('Pick a country or currency first');
+    $('#rateNote').innerHTML='<span class="spin"></span> Fetching live rate…';
+    try{const r=await run('getRate',cur,$('#fStart').value);$('#fRate').value=r.rate;rateSource=r.source+(r.historical?'':' · '+r.at);autoRate=true;
+      $('#rateNote').textContent=(r.historical?'Rate on '+dmy(r.at)+': ':'Live: ')+'1 '+cur+' = ₹'+r.rate+' ('+r.source.split(' rate of')[0]+'). Change it if your forex card rate differs.'}
+    catch(e){$('#rateNote').textContent=errMsg(e)}};
+  sel.onchange=()=>{const v=sel.value;$('#otherBox').style.display=v==='other'?'block':'none';if(v!==''&&v!=='other'&&!$('#fCur').readOnly){$('#fCur').value=COUNTRIES[+v][2];$('#curLbl').textContent=COUNTRIES[+v][2];live()}};
+  $('#fCur').onchange=()=>{$('#curLbl').textContent=$('#fCur').value.toUpperCase()||'unit';if($('#fCur').value.length===3)live()};
+  $('#fRate').oninput=()=>{rateSource='Entered by traveller';autoRate=false;$('#rateNote').textContent='Your rate'};
+  $('#fStart').onchange=()=>{if(autoRate&&$('#fCur').value.length===3)live()};
+  $('#rateLive').onclick=live;
+  $('#rateBtn').onclick=()=>pickPhoto('gal',async f=>{try{rateShot=await compress(f,1200,.85);$('#rateThumb').style.backgroundImage=`url('${rateShot}')`}catch(e){toast(e.message)}});
+  const ul=$('#useLeft');if(ul)ul.onclick=()=>{$('#fCardRet').value=Math.max(0,tt.cardLeft);$('#fCashRet').value=Math.max(0,tt.cashLeft)};
+  const del=$('#fDel');if(del)del.onclick=async()=>{if(!await ask('Delete "'+t.name+'"? Its sheet, photos and PDFs move to your Drive bin.','Delete',true))return;busy('Deleting…');try{S.trips=await run('deleteTrip',t.id);done();S.trip=null;toast('Trip deleted');go('home')}catch(e){done();toast(errMsg(e))}};
+  $('#fSave').onclick=async()=>{
+    const v=sel.value,isOther=v==='other';
+    const d={name:$('#fName').value.trim(),country:isOther?$('#fCountryOther').value.trim():(v!==''?COUNTRIES[+v][0]:''),
+      code:(isOther?$('#fCode').value:(v!==''?COUNTRIES[+v][1]:'')).trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,3),
+      currency:$('#fCur').value.trim().toUpperCase(),rate:Number($('#fRate').value),rateSource:rateSource||'Entered by traveller',
+      cities:$('#fCities').value.trim(),start:$('#fStart').value,end:$('#fEnd').value,purpose:$('#fPurpose').value.trim(),
+      cardLoad:Number($('#fCard').value)||0,cashTaken:Number($('#fCash').value)||0,cashRate:Number($('#fCashRate').value)||0,tickets:Number($('#fTickets').value)||0};
+    if(editing){d.cardReturned=Number($('#fCardRet').value)||0;d.cashReturned=Number($('#fCashRet').value)||0}
+    if(rateShot)d.rateShot=rateShot;
+    const past=$('#fPast');if(past&&past.checked)d.status='Submitted';
+    if(!d.name||!d.country||d.currency.length!==3||!(d.rate>0))return toast('Add trip name, country, currency and rate');
+    busy(editing?'Saving…':'Creating your trip sheet…');
+    try{const r=editing?await run('updateTrip',t.id,d):await run('createTrip',d);setTrip(r);done();toast(editing?'Saved':'Trip created');S.tab='bills';S.day=null;go('trip')}
+    catch(e){done();toast(errMsg(e))}
+  };
+}
+
+function loadPhoto(fileId,cb){if(S.photoCache[fileId])return cb(S.photoCache[fileId]);run('getPhoto',fileId).then(u=>{S.photoCache[fileId]=u;cb(u)}).catch(()=>{})}
+
+/* ───────── trip ───────── */
+function viewTrip(){
+  const t=S.trip;if(!t)return go('home');
+  head(t.name,()=>go('home'),()=>go('tripForm'));
+  const c=calc(t,S.bills);
+  const nd=days(t.start,t.end)||'—';
+  const dayTotals={};S.bills.forEach(b=>{dayTotals[b.date]=(dayTotals[b.date]||0)+b.amount*b.rate});
+  const dayKeys=Object.keys(dayTotals).sort();
+  if(S.day&&!dayTotals[S.day])S.day=null;
+  const shown=S.bills.slice().reverse().filter(b=>!S.day||b.date===S.day);
+  const short=v=>v>=100000?(v/100000).toFixed(1)+'L':v>=1000?(v/1000).toFixed(1)+'k':Math.round(v);
+  const cats=SECS.map(s=>({k:s.k,label:s.label,n:c.sec[s.k].n,inr:c.sec[s.k].inr})).concat([{k:'Personal',label:'Out of pocket',n:c.oop.n,inr:c.oop.inr}]);
+  const billRow=b=>`
+      <button class="it" data-id="${esc(b.id)}">
+        <span class="thumb" style="${b.thumb?`background-image:url('${b.thumb}')`:''}">${b.thumb?tile(tileKey(b)):`<span class="tile ${tileKey(b)}" style="position:static;width:44px;height:44px;border-radius:14px;border:0">${ico(tileKey(b),20)}</span>`}</span>
+        <span class="m"><span class="nm">${esc(b.vendor||secLabel(b.category))}</span>
+          <span class="sub">${/^No bill available/.test(b.description)?'No bill · card statement':(b.payment==='Personal'?'Out of pocket':secLabel(b.category))+' · '+payLabel(b.payment)}${b.time?' · '+esc(b.time):''}</span></span>
+        <span class="amt"><b class="money">${esc(b.currency)} ${n2(b.amount)}</b><span class="mute money">₹ ${n2(b.amount*b.rate)}</span></span>
+      </button>`;
+  $('#app').innerHTML=`
+    <div class="strip">
+      <div class="row" style="align-items:center"><span class="lbl">${esc(t.country)} · ${dmy(t.start)}${t.end?' – '+dmy(t.end):''}</span><span class="lbl" style="flex:none">1 ${esc(t.currency)} = ₹${esc(t.rate)}</span></div>
+      <div class="lbl" style="margin-top:10px">total spent</div><div class="tot money">₹ ${n2(c.total)}</div>
+      <div class="stats">
+        <div><b>${S.bills.length}</b><span>bills</span></div>
+        <div><b>${nd}</b><span>days</span></div>
+        <div><b class="money lime">₹ ${short(typeof nd==='number'&&nd?c.total/nd:c.total)}</b><span>per day</span></div>
+      </div>
+    </div>
+    <div class="bal">
+      <div><span class="mute">forex card left</span><b class="money">${esc(t.currency)} ${n2(c.cardLeft)}</b></div>
+      <div><span class="mute">forex cash left</span><b class="money">${esc(t.currency)} ${n2(c.cashLeft)}</b></div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab ${S.tab==='bills'?'on':''}" data-tab="bills">Bills</button>
+      <button class="tab ${S.tab==='cats'?'on':''}" data-tab="cats">Categories</button>
+      <button class="tab ${S.tab==='submit'?'on':''}" data-tab="submit">Submit</button>
+    </div>
+    ${S.tab==='bills'?`
+      ${dayKeys.length?`<div class="days"><button class="daychip all ${!S.day?'on':''}" data-day="">All</button>${dayKeys.map(d=>{const dt=new Date(d+'T00:00:00');return `<button class="daychip ${S.day===d?'on':''}" data-day="${d}"><div class="w">${dt.toLocaleDateString('en-GB',{weekday:'short'})}</div><div class="d">${dt.getDate()}</div><div class="m">${dt.toLocaleDateString('en-GB',{month:'short'})}</div><span class="a">₹${short(dayTotals[d])}</span></button>`}).join('')}</div>`:''}
+      <button class="btn line sm" id="many" style="margin-top:12px">${ico('img')} Add several bills from gallery</button>
+      <div class="card list">${shown.length?shown.map(billRow).join(''):`<div class="empty" style="padding:24px 8px"><b>No bills yet</b><p class="mute" style="margin:0">Tap “Add bill” after each payment. The app reads the photo for you.</p></div>`}</div>`
+    :S.tab==='cats'?`
+      <div class="card list">${cats.map(x=>{const pct=c.total?Math.round(x.inr/c.total*100):0;return `
+        <div class="it" style="cursor:default">${tile(x.k)}<span class="m"><span class="nm">${x.label}</span><span class="sub">${x.n} bill${x.n===1?'':'s'}</span><div class="bar2"><i style="width:${pct}%;background:var(--c-${x.k})"></i></div></span>
+        <span class="amt"><b class="money">₹ ${n2(x.inr)}</b></span><span class="pct">${pct}%</span></div>`}).join('')}</div>
+      <div class="card list">${PAYS.map(p=>`<div class="it" style="cursor:default"><span class="m"><span class="nm">${p.label}</span></span><span class="amt"><b class="money">₹ ${n2(c.pay[p.k]||0)}</b></span></div>`).join('')}</div>`
+    :`
+      <div class="card">
+        <b>Ready to submit?</b>
+        <p class="mute" style="margin:4px 0 0">Check the statement, add the currency you returned, then make the PDFs. Everything is saved in your Google Drive.</p>
+        <div style="height:12px"></div>
+        <button class="btn line" id="stmt">${ico('doc')} View statement</button>
+        <div style="height:10px"></div>
+        <a class="btn line" href="${esc(t.sheetUrl)}" target="_blank">${ico('sheet')} Open Google Sheet</a>
+        <div style="height:10px"></div>
+        <button class="btn line" id="stmtPdf">${ico('file')} Statement PDF</button>
+        <div style="height:10px"></div>
+        <button class="btn line" id="pdf">${ico('file')} Bills PDF</button>
+        <div style="height:10px"></div>
+        <button class="btn line" id="cardSt">${ico('doc')} Forex card statement</button>
+        <div id="pdfOut"></div>
+        <div style="height:10px"></div>
+        <button class="btn line" id="ret">Currency returned & trip details</button>
+        <div style="height:10px"></div>
+        <button class="btn ${t.status==='Submitted'?'line':'lime'}" id="markSub">${t.status==='Submitted'?'Mark as active again':'Mark trip as submitted'}</button>
+      </div>`}`;
+  fab(`<button class="btn fab" id="addBill">${ico('cam',20)} Add bill</button>`);
+  $('#addBill').onclick=()=>{S.draft=null;go('bill')};
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;viewTrip()});
+  document.querySelectorAll('.daychip').forEach(b=>b.onclick=()=>{S.day=b.dataset.day||null;viewTrip()});
+  const on=(id,f)=>{const el=$('#'+id);if(el)el.onclick=f};
+  on('many',()=>pickMany(startQueue));
+  on('cardSt',openCard);
+  on('stmt',()=>go('statement'));on('pdf',pdfMenu);on('ret',()=>go('tripForm'));on('stmtPdf',statementPdf);
+  on('markSub',async()=>{const st=t.status==='Submitted'?'Active':'Submitted';busy('Updating…');try{setTrip(await run('updateTrip',t.id,{status:st}));done();toast(st==='Submitted'?'Marked as submitted':'Marked as active');viewTrip()}catch(e){done();toast(errMsg(e))}});
+  document.querySelectorAll('.it[data-id]').forEach(el=>el.onclick=()=>{const b=S.bills.find(x=>x.id===el.dataset.id);S.draft=Object.assign({editing:true,editId:b.id},b);go('bill')});
+}
+
+/* ───────── add / edit bill ───────── */
+function viewBill(){
+  const t=S.trip;
+  const d=S.draft=S.draft||{date:today(),time:'',currency:t.currency,rate:t.rate,category:'',payment:'',vendor:'',description:'',amount:''};
+  if(d.editing&&d.fileId&&!d.localUrl&&!d.fullUrl){loadPhoto(d.fileId,u=>{d.fullUrl=u;if(S.view==='bill'&&S.draft===d){const im=$('#billImg');if(im)im.src=u}})}
+  const src=d.localUrl||d.fullUrl||d.thumb||'';
+  const qPos=S.qTotal?S.qTotal-S.queue.length:0;
+  head(d.editing?d.id:(S.qTotal?'bill '+qPos+' of '+S.qTotal:'add bill'),()=>{S.queue=[];S.qTotal=0;go('trip')});fab('');
+  $('#app').innerHTML=`
+    <div class="photo">${src?`<img id="billImg" src="${src}" alt="Bill photo">`:`<div class="pick"><div class="mute" style="margin-bottom:4px">Take a clear photo of the whole bill</div><button class="btn" id="cam">${ico('cam',20)} Take photo</button><button class="btn line" id="gal">${ico('img',20)} Choose from gallery</button></div>`}</div>
+    ${src?`<div class="row" style="margin-top:8px"><button class="btn line sm" id="cam">Retake</button><button class="btn line sm" id="gal">Choose another</button></div>`:''}
+    <div id="readStatus">${d.status?`<div class="status ${d.statusCls||''}">${d.status}</div>`:''}</div>
+    <div class="grid2">
+      <label class="f">Amount<input class="i" id="bAmt" type="number" inputmode="decimal" step="any" value="${esc(d.amount)}"></label>
+      <label class="f">Currency<input class="i" id="bCur" maxlength="3" value="${esc(d.currency)}" style="text-transform:uppercase"></label>
+    </div>
+    <div class="inr" id="inrLine"></div>
+    <div id="rateBox" style="display:none"><label class="f">Rate for this bill (₹ per unit)<input class="i" id="bRate" type="number" inputmode="decimal" step="any" value="${esc(d.rate)}"></label></div>
+    <p class="form-title">Paid by</p>
+    <div class="chips" id="payChips">${PAYS.map(p=>`<button class="chip plain ${d.payment===p.k?'on':''}" data-v="${p.k}">${p.label}</button>`).join('')}</div>
+    <div id="inrBox" style="display:none"><label class="f">₹ actually charged to you<input class="i" id="bInr" type="number" inputmode="decimal" step="any" value="${d.payment==='Personal'&&d.amount?esc(r2(d.amount*d.rate)):''}"></label><p class="mute" style="margin:6px 0 0">Goes to Out of pocket, in rupees.</p></div>
+    <p class="form-title">Section</p>
+    <div class="chips" id="secChips">${SECS.map(s=>`<button class="chip ${d.category===s.k?'on':''}" data-v="${s.k}">${tile(s.k)}${s.label}</button>`).join('')}</div>
+    <div class="grid2">
+      <label class="f">Date<input class="i" id="bDate" type="date" value="${esc(d.date)}"></label>
+      <label class="f">Time<input class="i" id="bTime" type="time" value="${esc(d.time)}"></label>
+    </div>
+    <label class="f">Place / vendor<input class="i" id="bVendor" value="${esc(d.vendor)}"></label>
+    <label class="f">Description<input class="i" id="bDesc" value="${esc(d.description)}" placeholder="Dinner for 2, airport taxi…"></label>
+    <div style="height:20px"></div>
+    <button class="btn" id="bSave">${d.editing?'Save changes':S.qTotal?(S.queue.length?'Save · next bill ('+S.queue.length+' left)':'Save · last bill'):'Save bill'}</button>
+    ${d.editing?'':S.qTotal?'<button class="btn line" id="bSkip" style="margin-top:10px">Skip this photo</button>':'<button class="btn line" id="bSaveMore" style="margin-top:10px">Save and add another</button>'}
+    ${d.editing?'<div style="height:24px"></div><button class="btn danger sm" id="bDel">Delete bill</button>':''}`;
+
+  const sync=()=>{
+    d.amount=$('#bAmt').value;d.currency=$('#bCur').value.trim().toUpperCase();d.rate=$('#bRate').value;
+    d.date=$('#bDate').value;d.time=$('#bTime').value;d.vendor=$('#bVendor').value;d.description=$('#bDesc').value;d.inrTyped=$('#bInr').value;
+    const diff=d.currency!==t.currency&&d.currency!=='INR'&&d.payment!=='Personal';
+    $('#rateBox').style.display=diff?'block':'none';
+    $('#inrBox').style.display=d.payment==='Personal'?'block':'none';
+    const a=Number(d.amount)||0;
+    const inr=d.payment==='Personal'?Number($('#bInr').value)||0:a*(Number(d.rate)||0);
+    $('#inrLine').innerHTML=a?`≈ ₹ ${n2(inr)}${diff?' · <span style="color:var(--warn)">different currency, check the rate</span>':''}`:'';
+  };
+  const prefillInr=()=>{const a=Number($('#bAmt').value)||0;if(a&&!$('#bInr').value)$('#bInr').value=r2(d.currency==='INR'?a:a*t.rate)};
+  const curChanged=async()=>{const c=$('#bCur').value.trim().toUpperCase();
+    if(c===t.currency)$('#bRate').value=t.rate;else if(c==='INR')$('#bRate').value=1;
+    else if(c.length===3){try{const r=await run('getRate',c,$('#bDate').value);$('#bRate').value=r.rate;toast((r.historical?'Rate on '+dmy(r.at):'Live rate')+': 1 '+c+' = ₹'+r.rate)}catch(e){}}
+    sync()};
+  $('#bCur').onchange=curChanged;
+  if(d.inrTyped)$('#bInr').value=d.inrTyped;
+  ['bAmt','bCur','bRate','bDate','bTime','bVendor','bDesc','bInr'].forEach(id=>$('#'+id).addEventListener('input',sync));
+  const chips=(id,key,after)=>document.querySelectorAll('#'+id+' .chip').forEach(c=>c.onclick=()=>{d[key]=c.dataset.v;document.querySelectorAll('#'+id+' .chip').forEach(x=>x.classList.toggle('on',x===c));after&&after()});
+  chips('payChips','payment',()=>{if(d.payment==='Personal')prefillInr();sync()});
+  chips('secChips','category');
+  sync();
+  if(d.needRate){d.needRate=false;curChanged()}
+
+  const onFile=f=>useFile(d,f);
+  const sk=$('#bSkip');if(sk)sk.onclick=nextInQueue;
+  $('#cam').onclick=()=>pickPhoto('cam',onFile);
+  $('#gal').onclick=()=>pickPhoto('gal',onFile);
+  $('#bSave').onclick=()=>saveBill(false);
+  const more=$('#bSaveMore');if(more)more.onclick=()=>saveBill(true);
+  const del=$('#bDel');if(del)del.onclick=deleteBill;
+}
+
+async function useFile(d,f){
+  try{d.photo=await compress(f,1600,.82);d.thumb=await compress(f,160,.7);d.localUrl=d.photo;d.fullUrl=null}catch(e){return toast(e.message)}
+  if(S.view==='bill'&&S.draft===d)viewBill();
+  readBill(d);
+}
+function startQueue(files){S.queue=files.slice();S.qTotal=files.length;toast(files.length+' photos · the app reads each one, you confirm and save');nextInQueue()}
+function nextInQueue(){
+  const f=S.queue.shift();
+  if(!f){S.qTotal=0;S.draft=null;go('trip');return}
+  S.draft=null;S.view='bill';viewBill();useFile(S.draft,f);
+}
+function setStatus(d,msg,cls){d.status=msg;d.statusCls=cls||'';const el=$('#readStatus');if(el&&S.view==='bill'&&S.draft===d)el.innerHTML=msg?`<div class="status ${cls||''}">${msg}</div>`:''}
+
+async function readBill(d){
+  const t=S.trip;
+  if(!S.boot.hasKey){setStatus(d,'Bill reading is off. Type the details below.','warn');return}
+  setStatus(d,'<span class="spin"></span> Reading the bill…');
+  let r;try{r=await run('readBill',d.photo,t.currency)}catch(e){r={ok:false,error:errMsg(e)}}
+  if(S.draft!==d)return;
+  if(!r.ok){setStatus(d,esc(r.error),'warn');return}
+  if(r.amount)d.amount=r.amount;
+  if(r.currency)d.currency=String(r.currency).toUpperCase().slice(0,3);
+  if(d.currency===t.currency)d.rate=t.rate;else if(d.currency==='INR')d.rate=1;else d.needRate=true;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(r.date||''))d.date=r.date;
+  if(/^\d{1,2}:\d{2}$/.test(r.time||''))d.time=r.time.padStart(5,'0');
+  if(r.vendor)d.vendor=r.vendor;if(r.description)d.description=r.description;
+  if(SECS.some(s=>s.k===r.category))d.category=r.category;
+  if(!d.payment&&(r.payment==='Card'||r.payment==='Cash'))d.payment=r.payment;
+  const low=r.confidence==='low';
+  d.status=low?'Not sure about the amount. Please check it against the photo.':'Filled from the bill. Check the details and save.'+(d.payment?'':' Choose how you paid.');
+  d.statusCls=low?'warn':'ok';
+  if(S.view==='bill')viewBill();
+}
+
+async function saveBill(another){
+  const t=S.trip,d=S.draft;
+  const amount=Number(d.amount);
+  if(!(amount>0))return toast('Enter the amount');
+  if(!d.payment)return toast('Choose how you paid');
+  if(!d.category)return toast('Choose a section');
+  if(!d.date)return toast('Add the date');
+  if(!d.photo&&!d.fileId&&!await ask('No photo attached. Save anyway?','Save'))return;
+  let rate=null,inr=null;
+  if(d.payment==='Personal'){inr=Number($('#bInr').value)||0;if(!(inr>0))return toast('Enter the ₹ charged to you')}
+  else{rate=d.currency===t.currency?t.rate:(d.currency==='INR'?1:Number(d.rate));if(!(rate>0))return toast('Enter the rate for '+d.currency)}
+  const rec={editId:d.editId||null,date:d.date,time:d.time||'',category:d.category,payment:d.payment,vendor:(d.vendor||'').trim(),description:(d.description||'').trim(),
+    currency:d.currency,amount:amount,rate:rate,inr:inr,photo:d.photo||null,thumb:d.photo?d.thumb:null};
+  busy(d.photo?'Uploading photo and saving…':'Saving…');
+  try{const r=await run('saveBill',t.id,rec);setTrip(r);done();toast('Saved '+r.billId);S.draft=null;
+    if(S.qTotal&&!d.editing)return nextInQueue();
+    if(another)viewBill();else go('trip')}
+  catch(e){done();toast(errMsg(e))}
+}
+
+async function deleteBill(){
+  const d=S.draft;if(!await ask('Delete bill '+d.id+'?','Delete',true))return;
+  busy('Deleting…');
+  try{setTrip(await run('deleteBill',S.trip.id,d.id));done();toast('Deleted');S.draft=null;go('trip')}catch(e){done();toast(errMsg(e))}
+}
+
+/* ───────── statement preview ───────── */
+function viewStatement(){
+  const t=S.trip,p=S.profile,c=calc(t,S.bills);
+  head('statement',()=>go('trip'));fab('');
+  const cashRate=Number(t.cashRate)||t.rate;
+  const line=(no,name,amt,rate,inr)=>`<tr><td>${no}</td><td>${name}</td><td class="n">${amt}</td><td class="n">${rate}</td><td class="n">${inr}</td></tr>`;
+  const block=(title,list,oop)=>{
+    const rows=list.map((b,i)=>{const amt=oop?r2(b.amount*b.rate):(b.currency===t.currency?b.amount:r2(b.amount*b.rate/t.rate));return `<tr><td>${i+1}</td><td class="money">${dmy(b.date)}</td><td>${esc(b.vendor)}${b.description?' – '+esc(b.description):''}</td><td style="font-size:12px">${esc(b.id)}</td><td class="n">${n2(amt)}</td><td class="n">${oop?'1.000':Number(t.rate).toFixed(3)}</td><td class="n">${n2(b.amount*b.rate)}</td></tr>`}).join('');
+    const sa=list.reduce((s,b)=>s+(oop?r2(b.amount*b.rate):(b.currency===t.currency?b.amount:r2(b.amount*b.rate/t.rate))),0),si=list.reduce((s,b)=>s+r2(b.amount*b.rate),0);
+    return `<h2>${title}</h2><div class="card scroll" style="padding:8px 12px"><table style="min-width:560px"><thead><tr><th>SNO</th><th>DATE</th><th>PLACE</th><th>BILL NO</th><th class="n">CURRENCY</th><th class="n">CONV. RATE</th><th class="n">INR</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="mute">No bills</td></tr>'}<tr class="tot"><td colspan="4">TOTAL MENTIONED IN SUMMARY SHEET</td><td class="n">${n2(sa)}</td><td class="n">${oop?'1.000':Number(t.rate).toFixed(3)}</td><td class="n">${n2(si)}</td></tr></tbody></table></div>`};
+  const fx=k=>S.bills.filter(b=>b.payment!=='Personal'&&b.category===k);
+  $('#app').innerHTML=`
+    <p class="mute" style="margin-top:8px">This is what your Google Sheet shows. <a href="${esc(t.sheetUrl)}" target="_blank" style="color:var(--ok)">Open the sheet</a></p>
+    <div class="card">
+      <b>FOREIGN TRAVEL EXPENSES STATEMENT</b>
+      <table style="margin-top:8px"><tbody>
+        <tr><td>Name of the employee</td><td>${esc(p.empName||'—')}</td></tr><tr><td>Emp no</td><td>${esc(p.empNo||'—')}</td></tr>
+        <tr><td>Place of visit</td><td>${esc(t.country)}${t.cities?' – '+esc(t.cities):''}</td></tr>
+        <tr><td>Date of visit</td><td>${dot(t.start)} - ${dot(t.end)}</td></tr><tr><td>No of days</td><td>${days(t.start,t.end)||'—'}</td></tr>
+        <tr><td>Currency</td><td>${esc(CUR_NAMES[t.currency]||t.currency)} · total taken ${n2((t.cardLoad||0)+(t.cashTaken||0))}</td></tr>
+        <tr><td>Conv. rate</td><td>${Number(t.rate).toFixed(3)}</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card scroll"><table style="min-width:420px"><thead><tr><th></th><th></th><th class="n">CURRENCY</th><th class="n">CONV. RATE</th><th class="n">AMOUNT IN INR</th></tr></thead><tbody>
+      ${line(1,'Travel ticket, visa & other <span class="mute">(booked by company)</span>','','','')}
+      ${line(2,'Hotel exp',n2(c.sec.Hotel.amt),Number(t.rate).toFixed(3),n2(c.sec.Hotel.inr))}
+      ${line(3,'Food exp',n2(c.sec.Food.amt),Number(t.rate).toFixed(3),n2(c.sec.Food.inr))}
+      ${line(4,'Taxi/train/bus exp',n2(c.sec.Transport.amt),Number(t.rate).toFixed(3),n2(c.sec.Transport.inr))}
+      ${line(5,'Other exp',n2(c.sec.Other.amt),Number(t.rate).toFixed(3),n2(c.sec.Other.inr))}
+      ${line(8,'Out of pocket',n2(c.oop.inr),'1.000',n2(c.oop.inr))}
+      <tr class="tot"><td></td><td colspan="3">Total expenses paid</td><td class="n">${n2(c.total)}</td></tr>
+      <tr><td></td><td colspan="3">Air ticket / insurance paid by company</td><td class="n">${t.tickets?n2(t.tickets):'—'}</td></tr>
+    </tbody></table></div>
+    <div class="card scroll"><b>Imprest details</b><table style="min-width:420px;margin-top:6px"><thead><tr><th>Foreign currency taken</th><th class="n">Currency</th><th class="n">Conv. rate</th><th class="n">INR</th></tr></thead><tbody>
+      <tr><td>Card</td><td class="n">${n2(t.cardLoad)}</td><td class="n">${Number(t.rate).toFixed(3)}</td><td class="n">${n2((t.cardLoad||0)*t.rate)}</td></tr>
+      <tr><td>Cash</td><td class="n">${n2(t.cashTaken)}</td><td class="n">${Number(cashRate).toFixed(3)}</td><td class="n">${n2((t.cashTaken||0)*cashRate)}</td></tr>
+      <tr class="tot"><td colspan="3">Total imprest</td><td class="n">${n2(c.imprest)}</td></tr>
+    </tbody></table>
+    <table style="min-width:420px;margin-top:14px"><thead><tr><th>Currency returned</th><th class="n">Amount</th><th class="n">Conv. rate</th><th class="n">INR</th></tr></thead><tbody>
+      <tr><td>Card</td><td class="n">${n2(t.cardReturned)}</td><td class="n">${Number(t.rate).toFixed(3)}</td><td class="n">${n2((t.cardReturned||0)*t.rate)}</td></tr>
+      <tr><td>Cash</td><td class="n">${n2(t.cashReturned)}</td><td class="n">${Number(cashRate).toFixed(3)}</td><td class="n">${n2((t.cashReturned||0)*cashRate)}</td></tr>
+      <tr class="tot"><td colspan="3">Amount due to company</td><td class="n">${n2(c.due)}</td></tr>
+    </tbody></table>
+    <p class="mute" style="margin:8px 0 0">${c.due<0?'Negative: the company owes you ₹ '+n2(-c.due)+'.':c.due>0?'Positive: you owe the company ₹ '+n2(c.due)+'.':'Settled.'}</p></div>
+    ${block('hotel expenses',fx('Hotel'))}${block('food expenses',fx('Food'))}${block('other expenses',fx('Other'))}${block('taxi / train / bus expenses',fx('Transport'))}${block('out of pocket',S.bills.filter(b=>b.payment==='Personal'),true)}`;
+}
+
+/* ───────── forex card statement ───────── */
+async function openCard(){busy('Checking the card statement…');try{S.stmt=await run('getStatement',S.trip.id);done();go('card')}catch(e){done();toast(errMsg(e))}}
+function uploadPdf(){
+  const inp=$('#pdfIn');inp.value='';
+  inp.onchange=()=>{const f=inp.files[0];if(!f)return;if(f.size>15e6)return toast('That PDF is over 15 MB');
+    const fr=new FileReader();fr.onload=async()=>{busy('Reading the statement… this can take 20–40 seconds');
+      try{S.stmt=await run('uploadStatement',S.trip.id,fr.result);done();toast('Statement read: '+S.stmt.txns.length+' rows');viewCard()}catch(e){done();toast(errMsg(e))}};
+    fr.readAsDataURL(f)};
+  inp.click();
+}
+function viewCard(){
+  const t=S.trip,st=S.stmt||{has:false};
+  head('card statement',()=>go('trip'));fab('');
+  if(!st.has){
+    $('#app').innerHTML=`<div class="card empty" style="text-align:left"><b>Upload your forex card statement</b>
+      <p class="mute">Add the PDF from Thomas Cook (or your card provider). The app saves it in the trip folder, reads every card payment, and checks each one against your bills. Payments with no bill can be added as “No bill available – as per card statement”.</p>
+      <button class="btn" id="up">${ico('file')} Choose statement PDF</button></div>`;
+    $('#up').onclick=uploadPdf;return;
+  }
+  const pays=st.txns.filter(x=>x.status!=='info'),miss=pays.filter(x=>x.status==='nobill'),ok=pays.filter(x=>x.status==='matched'),info=st.txns.filter(x=>x.status==='info');
+  const row=(x,extra)=>`<div class="it" style="cursor:default;align-items:flex-start">${extra||''}<span class="m"><span class="nm">${esc(x.description)}</span><span class="sub">${dmy(x.date)}${x.billId?' · '+esc(x.billId):''}${x.billAmount&&x.billAmount!==x.amount?' · bill '+n2(x.billAmount):''}</span></span><span class="amt"><b class="money">${esc(x.currency)} ${n2(x.amount)}</b></span></div>`;
+  $('#app').innerHTML=`
+    <div class="card">
+      <div class="row" style="align-items:center"><b>Forex card statement</b>${st.fileUrl?`<a class="btn line sm" style="flex:none;width:auto" href="${esc(st.fileUrl)}" target="_blank">Open PDF</a>`:''}</div>
+      <div class="cnt"><div><b>${pays.length}</b><span class="mute">card payments</span></div><div><b style="color:var(--ok)">${ok.length}</b><span class="mute">have a bill</span></div><div><b style="color:var(--c-Hotel)">${miss.length}</b><span class="mute">no bill</span></div></div>
+      ${st.closing?`<p class="mute" style="margin:10px 0 0">Closing balance on the statement: ${esc(t.currency)} ${n2(st.closing)}</p>`:''}
+    </div>
+    ${miss.length?`<h2>no bill found</h2><p class="mute" style="margin:-4px 0 8px">Tick the payments to add. Check the section for each.</p>
+      <div class="card list">${miss.map(x=>row(x,`<input type="checkbox" class="ck" data-i="${x.i}" checked style="margin-top:2px">`)+`<div style="display:flex;justify-content:flex-end;margin:-4px 0 8px"><select class="sel" data-sec="${x.i}">${SECS.map(s=>`<option value="${s.k}" ${s.k===x.section?'selected':''}>${s.label}</option>`).join('')}</select></div>`).join('')}</div>
+      <button class="btn" id="addMiss" style="margin-top:12px">Add ticked as “no bill available”</button>`:`<div class="status ok" style="margin-top:12px">Every card payment has a bill.</div>`}
+    ${st.notOnStatement.length?`<h2>bills not on the statement</h2><p class="mute" style="margin:-4px 0 8px">Marked as forex card, but no matching payment was found. Check the amount, date, or whether it was paid another way.</p>
+      <div class="card list">${st.notOnStatement.map(b=>`<button class="it" data-bill="${esc(b.id)}"><span class="m"><span class="nm">${esc(b.vendor||b.id)}</span><span class="sub">${dmy(b.date)} · ${esc(b.id)}</span></span><span class="amt"><b class="money">${esc(b.currency)} ${n2(b.amount)}</b></span></button>`).join('')}</div>`:''}
+    ${ok.length?`<h2>matched</h2><div class="card list">${ok.map(x=>row(x,'<span class="pill ok" style="margin-top:2px">✓</span>')).join('')}</div>`:''}
+    ${info.length?`<h2>loads, cash withdrawals & refunds</h2><div class="card list">${info.map(x=>row(x,`<span class="pill" style="margin-top:2px">${esc(x.type)}</span>`)).join('')}</div>`:''}
+    <div style="height:16px"></div><button class="btn line sm" id="replace">Replace statement PDF</button>`;
+  $('#replace').onclick=uploadPdf;
+  document.querySelectorAll('[data-bill]').forEach(el=>el.onclick=()=>{const b=S.bills.find(x=>x.id===el.dataset.bill);if(b){S.draft=Object.assign({editing:true,editId:b.id},b);go('bill')}});
+  const am=$('#addMiss');
+  if(am)am.onclick=async()=>{
+    const items=[...document.querySelectorAll('.ck:checked')].map(c=>({i:+c.dataset.i,category:$(`[data-sec="${c.dataset.i}"]`).value}));
+    if(!items.length)return toast('Tick at least one payment');
+    busy('Adding '+items.length+' entries…');
+    try{const r=await run('addFromStatement',S.trip.id,items);setTrip(r);S.stmt=r.statement;done();toast('Added '+items.length+' entries');viewCard()}catch(e){done();toast(errMsg(e))}
+  };
+}
+
+/* ───────── PDFs ───────── */
+function pdfReady(r,label){
+  const out=$('#pdfOut');
+  const html=`<div class="status ok" style="margin-top:10px">${esc(label)} ready${r.count?' · '+r.count+' bills':''}. Saved in your trip folder.</div><a class="btn" style="margin-top:8px" href="${esc(r.url)}" target="_blank">${ico('file')} Open PDF</a>`;
+  if(out)out.innerHTML=html;else modal(html+'<button class="btn line sm" id="mClose" style="margin-top:10px">Close</button>');
+  const mc=$('#mClose');if(mc)mc.onclick=closeModal;
+}
+async function statementPdf(){busy('Making the statement PDF…');try{const r=await run('exportStatement',S.trip.id);done();pdfReady(r,'Statement PDF')}catch(e){done();toast(errMsg(e))}}
+function pdfMenu(){
+  if(!S.bills.length)return toast('No bills yet');
+  const cnt=k=>S.bills.filter(b=>b.payment===k).length;
+  modal(`<b style="font-size:18px">bills PDF</b><p class="mute" style="margin:4px 0 12px">Cover with totals, the rate screenshot, then one bill per page.</p>
+    <button class="btn" data-m="all">All bills · ${S.bills.length}</button>
+    <div class="grid2" style="margin-top:10px"><button class="btn line sm" data-m="Card">Forex card · ${cnt('Card')}</button><button class="btn line sm" data-m="Cash">Forex cash · ${cnt('Cash')}</button></div>
+    <button class="btn line sm" data-m="Personal" style="margin-top:10px">Out of pocket · ${cnt('Personal')}</button>
+    <button class="btn line sm" id="mClose" style="margin-top:10px;background:none">Cancel</button>`);
+  $('#mClose').onclick=closeModal;
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{const m=b.dataset.m;busy('Building the PDF… (about 2 s per bill)');try{const r=await run('generatePdf',S.trip.id,m);done();pdfReady(r,'Bills PDF')}catch(e){done();toast(errMsg(e))}});
+}
+
+/* ───────── app key (first launch) ───────── */
+function viewKey(){
+  try{done()}catch(e){}
+  head('',null,null);fab('');
+  $('#app').innerHTML=`
+    <div style="margin-top:12px"><div class="mute" style="font-size:15px">welcome to</div><div class="hello">Trip Expenses</div></div>
+    <div class="card">
+      <b>Enter your app key</b>
+      <p class="mute" style="margin:4px 0 0">You only do this once on this phone. Find the key in Apps Script: run <b>setup</b> and copy the key from the log.</p>
+      <label class="f">App key<input class="i" id="kIn" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <div style="height:14px"></div><button class="btn" id="kGo">Unlock</button>
+    </div>`;
+  $('#kGo').onclick=async()=>{const k=$('#kIn').value.trim();if(!k)return toast('Paste your key');keyStore.set(k);boot()};
+}
+async function boot(){
+  if(!keyStore.get())return viewKey();
+  $('#app').innerHTML='<p class="mute" style="margin-top:24px"><span class="spin"></span> Loading your trips…</p>';
+  try{const b=await run('getBoot');S.boot=b;S.profile=b.profile;S.trips=b.trips;render()}
+  catch(e){if(e.code==='bad_key')return;$('#app').innerHTML=`<div class="card empty"><b>Could not start</b><p class="mute">${esc(errMsg(e))}</p><button class="btn line sm" id="retry">Try again</button></div>`;$('#retry').onclick=boot}
+}
+/* ───────── start ───────── */
+boot();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
