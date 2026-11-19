@@ -224,36 +224,83 @@ function deleteTrip(id) {
   return listTrips_();
 }
 
+
+/* ═════════════════════ Gemini (bill & statement reading) ═════════════════════ */
+
+/** Calls Gemini with the current model. If Google has retired the model name (404), finds a current
+ *  "flash" model that can read images, remembers it, and tries again. */
+function gemini_(parts, schema) {
+  const key = props_().getProperty('GEMINI_API_KEY');
+  if (!key) throw new Error('NO_KEY');
+  const body = JSON.stringify({ contents: [{ parts: parts }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: schema } });
+  const call = model => UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+    method: 'post', contentType: 'application/json', headers: { 'x-goog-api-key': key }, payload: body, muteHttpExceptions: true });
+  let model = props_().getProperty('GEMINI_MODEL') || props_().getProperty('GEMINI_MODEL_AUTO') || 'gemini-flash-latest';
+  let res = call(model);
+  if (res.getResponseCode() === 404 || res.getResponseCode() === 400 && /not found|not supported/i.test(res.getContentText())) {
+    const found = findModel_(key, model);
+    if (found) { props_().setProperty('GEMINI_MODEL_AUTO', found); props_().deleteProperty('GEMINI_MODEL'); res = call(found); }
+  }
+  if (res.getResponseCode() !== 200) throw new Error('HTTP_' + res.getResponseCode());
+  const j = JSON.parse(res.getContentText());
+  const p = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+  if (!p || !p[0] || !p[0].text) throw new Error('EMPTY');
+  return JSON.parse(p[0].text);
+}
+
+/** Lists the models this key can use and picks the newest stable "flash" model that supports generateContent. */
+function findModel_(key, notThis) {
+  try {
+    let names = [], token = '';
+    do {
+      const r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200' + (token ? '&pageToken=' + token : ''),
+        { headers: { 'x-goog-api-key': key }, muteHttpExceptions: true });
+      const j = JSON.parse(r.getContentText());
+      (j.models || []).forEach(m => { if ((m.supportedGenerationMethods || []).indexOf('generateContent') >= 0) names.push(String(m.name).replace('models/', '')); });
+      token = j.nextPageToken || '';
+    } while (token);
+    const ok = n => /flash/.test(n) && !/(tts|image|audio|live|embed|thinking|exp|8b)/.test(n) && n !== notThis;
+    const ver = n => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+    const pick = names.filter(ok).sort((a, b) =>
+      (/preview/.test(a) - /preview/.test(b)) || (/lite/.test(a) - /lite/.test(b)) || (ver(b) - ver(a)) || (a.length - b.length));
+    return pick[0] || (names.indexOf('gemini-flash-latest') >= 0 && notThis !== 'gemini-flash-latest' ? 'gemini-flash-latest' : '');
+  } catch (e) { return ''; }
+}
+
+/** Run from the editor to check bill reading: logs which Gemini model the app will use. */
+function testGemini() {
+  const key = props_().getProperty('GEMINI_API_KEY');
+  if (!key) return Logger.log('No GEMINI_API_KEY in Script properties.');
+  const m = findModel_(key, '');
+  Logger.log('Model the app will use: ' + (props_().getProperty('GEMINI_MODEL') || props_().getProperty('GEMINI_MODEL_AUTO') || m || 'none found'));
+  if (m && !props_().getProperty('GEMINI_MODEL')) props_().setProperty('GEMINI_MODEL_AUTO', m);
+}
+
 /* ═════════════════════ bills ═════════════════════ */
 
 function readBill(dataUrl, currency) {
-  const key = props_().getProperty('GEMINI_API_KEY');
-  if (!key) return { ok: false, error: 'Bill reading is off (no GEMINI_API_KEY). Type the details.' };
   try {
     const m = String(dataUrl).match(/^data:(.+?);base64,(.*)$/);
-    const model = props_().getProperty('GEMINI_MODEL') || 'gemini-2.5-flash';
-    const prompt = 'Read this photo of a bill or receipt from a business trip. The trip\'s local currency is ' + currency + '.\n' +
+    const prompt = 'Read this photo of a bill or receipt from a business trip (it may be rotated). The trip\'s local currency is ' + currency + '.\n' +
       'amount = FINAL total actually paid (incl. tax, service, tip). currency = ISO 4217, assume ' + currency + ' if none printed.\n' +
       'date YYYY-MM-DD, time HH:MM 24h or "". vendor = shop/company. description = max 8 words ("Dinner for 2", "Taxi airport to hotel").\n' +
       'category: Hotel (room, lodging) | Food (meals, drinks, groceries, cafés) | Transport (taxi, Uber, metro, train, bus, flight) | Other (fuel, parking, tolls, tickets, SIM, adapters, supplies).\n' +
       'payment: Card if card/VISA/Mastercard/contactless/auth code shown, Cash if cash/change shown, else Unknown. confidence for the amount.';
-    const body = {
-      contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: { type: 'OBJECT',
-        properties: { date: { type: 'STRING' }, time: { type: 'STRING' }, vendor: { type: 'STRING' }, description: { type: 'STRING' },
-          amount: { type: 'NUMBER' }, currency: { type: 'STRING' }, category: { type: 'STRING', enum: Object.keys(SECS) },
-          payment: { type: 'STRING', enum: ['Card', 'Cash', 'Unknown'] }, confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] } },
-        required: ['amount', 'currency', 'category'] } }
-    };
-    const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
-      method: 'post', contentType: 'application/json', headers: { 'x-goog-api-key': key }, payload: JSON.stringify(body), muteHttpExceptions: true });
-    if (res.getResponseCode() !== 200) return { ok: false, error: 'Could not read the bill (' + res.getResponseCode() + '). Type the details.' };
-    const j = JSON.parse(res.getContentText());
-    const p = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-    const out = JSON.parse(p[0].text);
+    const out = gemini_([{ text: prompt }, { inline_data: { mime_type: m[1], data: m[2] } }], { type: 'OBJECT',
+      properties: { date: { type: 'STRING' }, time: { type: 'STRING' }, vendor: { type: 'STRING' }, description: { type: 'STRING' },
+        amount: { type: 'NUMBER' }, currency: { type: 'STRING' }, category: { type: 'STRING', enum: Object.keys(SECS) },
+        payment: { type: 'STRING', enum: ['Card', 'Cash', 'Unknown'] }, confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] } },
+      required: ['amount', 'currency', 'category'] });
     out.ok = true;
     return out;
-  } catch (e) { return { ok: false, error: 'Could not read the bill. Type the details.' }; }
+  } catch (e) {
+    const c = String(e.message || e);
+    if (c === 'NO_KEY') return { ok: false, error: 'Bill reading is off (no GEMINI_API_KEY). Type the details.' };
+    if (c === 'HTTP_429') return { ok: false, error: 'Bill reading is busy (free limit reached). Wait a minute, or type the details.' };
+    if (c === 'HTTP_403' || c === 'HTTP_401') return { ok: false, error: 'Your Gemini key was refused. Check GEMINI_API_KEY in Script properties.' };
+    return { ok: false, error: 'Could not read the bill (' + c.replace('HTTP_', '') + '). Type the details.' };
+  }
 }
 
 /**
@@ -345,31 +392,25 @@ function uploadStatement(tripId, dataUrl) {
 }
 
 function parseStatement_(dataUrl, cur) {
-  const key = props_().getProperty('GEMINI_API_KEY');
-  if (!key) throw new Error('Reading the statement needs GEMINI_API_KEY in Script properties.');
   const m = String(dataUrl).match(/^data:(.+?);base64,(.*)$/);
-  const model = props_().getProperty('GEMINI_MODEL') || 'gemini-2.5-flash';
   const prompt = 'This is a prepaid forex card statement (e.g. Thomas Cook) for a business trip. The trip currency is ' + cur + '.\n' +
     'List EVERY transaction row. For each: date YYYY-MM-DD; description = merchant or narration as printed; amount = positive number in the card currency; ' +
     'currency = ISO code of that amount; type = purchase (card payment at a merchant, incl. online), atm (cash withdrawal), fee (bank/markup/ATM fee), load (money loaded or reloaded), refund (credit/reversal), other.\n' +
     'section = best guess for purchases: Hotel | Food | Transport (taxi, Uber, rail, metro, bus, flights) | Other.\n' +
     'Also give the opening and closing balance in the trip currency if printed (else 0).';
-  const body = {
-    contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
-    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: { type: 'OBJECT', properties: {
+  let out;
+  try {
+    out = gemini_([{ text: prompt }, { inline_data: { mime_type: m[1], data: m[2] } }], { type: 'OBJECT', properties: {
       openingBalance: { type: 'NUMBER' }, closingBalance: { type: 'NUMBER' },
       transactions: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
         date: { type: 'STRING' }, description: { type: 'STRING' }, amount: { type: 'NUMBER' }, currency: { type: 'STRING' },
         type: { type: 'STRING', enum: ['purchase', 'atm', 'fee', 'load', 'refund', 'other'] },
         section: { type: 'STRING', enum: Object.keys(SECS) } }, required: ['date', 'description', 'amount', 'type'] } } },
-      required: ['transactions'] } }
-  };
-  const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
-    method: 'post', contentType: 'application/json', headers: { 'x-goog-api-key': key }, payload: JSON.stringify(body), muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) throw new Error('Could not read the statement (' + res.getResponseCode() + ').');
-  const j = JSON.parse(res.getContentText());
-  const p = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-  const out = JSON.parse(p[0].text);
+      required: ['transactions'] });
+  } catch (e) {
+    const c = String(e.message || e);
+    throw new Error(c === 'NO_KEY' ? 'Reading the statement needs GEMINI_API_KEY in Script properties.' : 'Could not read the statement (' + c.replace('HTTP_', '') + ').');
+  }
   out.transactions = (out.transactions || []).map(x => ({ date: String(x.date || ''), description: String(x.description || '').trim(),
     amount: round_(Math.abs(Number(x.amount) || 0), 2), currency: String(x.currency || cur).toUpperCase(), type: x.type || 'other',
     section: SECS[x.section] ? x.section : 'Other' })).filter(x => x.amount > 0);
