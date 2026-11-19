@@ -182,8 +182,8 @@ function createTrip(d) {
       sheetUrl: ss.getUrl(), folderUrl: folder.getUrl(), createdAt: Date.now() });
     if (d.rateShot) trip.rateFileId = folder.createFile(blob_(d.rateShot, id + '_RATE')).getId();
     writeRateProof_(ss, trip);
-    s.reg.appendRow(REG_H.map(h => ''));
-    writeTrip_(s.reg.getLastRow(), trip);
+    const newRow = s.reg.getLastRow() + 1;   // write straight into the next free row (an empty appendRow is not counted)
+    writeTrip_(newRow, trip);
     render_(ss, trip, []);
     return { trip: clean_(tripRow_(id)), bills: [] };
   } finally { lock.releaseLock(); }
@@ -759,6 +759,12 @@ function env_() {
     p.setProperty('REGISTER_ID', ss.getId());
   }
   const regSh = ss.getSheetByName('Trips');
+  // Repair: an earlier version could write a trip over the header row. Put the header back above it.
+  if (String(regSh.getRange(1, 1).getValue()) !== 'Trip ID') {
+    if (regSh.getLastRow() > 0) regSh.insertRowBefore(1);
+    regSh.getRange(1, 1, 1, REG_H.length).setValues([REG_H]).setFontWeight('bold').setBackground('#1e7a58').setFontColor('#ffffff').setWrap(true);
+    regSh.setFrozenRows(1);
+  }
   if (regSh.getLastColumn() < REG_H.length) regSh.getRange(1, 1, 1, REG_H.length).setValues([REG_H]).setFontWeight('bold').setBackground('#1e7a58').setFontColor('#ffffff');
   ENV_ = { root: root, reg: regSh };
   return ENV_;
