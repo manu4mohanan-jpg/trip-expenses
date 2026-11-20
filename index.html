@@ -209,8 +209,9 @@ function pickMany(cb){const inp=$('#multiIn');inp.value='';inp.onchange=()=>{if(
 function pickPhoto(which,cb){const inp=which==='cam'?$('#camIn'):$('#galIn');inp.value='';inp.onchange=()=>{const f=inp.files[0];if(f)cb(f)};inp.click()}
 
 /* ───────── state ───────── */
-const S={queue:[],qTotal:0,trips:[],profile:{},trip:null,bills:[],draft:null,view:'home',tab:'bills',day:null,boot:null,photoCache:{}};
-function setTrip(r){S.trip=r.trip;S.bills=(r.bills||[]).slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));const i=S.trips.findIndex(t=>t.id===r.trip.id);if(i>=0)S.trips[i]=r.trip;else S.trips.unshift(r.trip)}
+const cache={get(k){try{return JSON.parse(localStorage.getItem('te_c_'+k)||'null')}catch(e){return null}},set(k,v){try{localStorage.setItem('te_c_'+k,JSON.stringify(v))}catch(e){}}};
+const S={sheet:{},queue:[],qTotal:0,trips:[],profile:{},trip:null,bills:[],draft:null,view:'home',tab:'bills',day:null,boot:null,photoCache:{}};
+function setTrip(r,fromCache){if(!fromCache){cache.set('trip_'+r.trip.id,{trip:r.trip,bills:r.bills||[]});if(S.sheet[r.trip.id]==='ready')S.sheet[r.trip.id]=null}S.trip=r.trip;S.bills=(r.bills||[]).slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));const i=S.trips.findIndex(t=>t.id===r.trip.id);if(i>=0)S.trips[i]=r.trip;else S.trips.unshift(r.trip);if(!fromCache&&S.boot)cache.set('boot',Object.assign({},S.boot,{profile:S.profile,trips:S.trips}))}
 
 /* ───────── maths ───────── */
 function calc(trip,bills){
@@ -277,13 +278,23 @@ function viewProfile(){
     <label class="f">Employee number<input class="i" id="pNo" value="${esc(p.empNo||'')}"></label>
     <div style="height:18px"></div><button class="btn" id="pSave">Save</button>
     <div style="height:30px"></div><button class="btn danger sm" id="pForget">Forget app key on this phone</button>`;
-  $('#pForget').onclick=async()=>{if(!await ask('Remove the app key from this phone? You will need to enter it again.','Remove',true))return;keyStore.clear();viewKey()};
-  $('#pSave').onclick=async()=>{busy('Saving…');try{S.profile=await run('saveProfile',{empName:$('#pName').value.trim(),empNo:$('#pNo').value.trim()});done();toast('Saved');go('home')}catch(e){done();toast(errMsg(e))}};
+  $('#pForget').onclick=async()=>{if(!await ask('Remove the app key from this phone? You will need to enter it again.','Remove',true))return;keyStore.clear();try{Object.keys(localStorage).filter(k=>k.indexOf('te_c_')===0).forEach(k=>localStorage.removeItem(k))}catch(e){}viewKey()};
+  $('#pSave').onclick=async()=>{busy('Saving…');try{S.profile=await run('saveProfile',{empName:$('#pName').value.trim(),empNo:$('#pNo').value.trim()});if(S.boot)cache.set('boot',Object.assign({},S.boot,{profile:S.profile,trips:S.trips}));done();toast('Saved');go('home')}catch(e){done();toast(errMsg(e))}};
 }
 
 async function openTrip(id){
-  busy('Opening trip…');
-  try{const r=await run('getTrip',id);setTrip(r);done();S.tab='bills';S.day=null;go('trip')}catch(e){done();toast(errMsg(e))}
+  const c=cache.get('trip_'+id);
+  S.tab='bills';S.day=null;
+  if(c){setTrip(c,true);go('trip')}else busy('Opening trip…');
+  try{const r=await run('getTrip',id);if(!c)done();setTrip(r);if(S.view==='trip'&&S.trip&&S.trip.id===id)viewTrip();else if(!c)go('trip')}
+  catch(e){if(!c){done();toast(errMsg(e))}else toast('Showing saved copy. '+errMsg(e))}
+}
+/* rebuild the company sheet only when it is needed (Submit tab / statement) */
+async function ensureSheet(){
+  const id=S.trip&&S.trip.id;if(!id||S.sheet[id]==='updating'||S.sheet[id]==='ready')return;
+  S.sheet[id]='updating';
+  try{await run('refreshSheet',id);S.sheet[id]='ready'}catch(e){S.sheet[id]=null;toast('Could not update the sheet: '+errMsg(e))}
+  if(S.view==='trip'&&S.tab==='submit'&&S.trip.id===id)viewTrip();
 }
 
 /* ───────── trip form (create / edit, incl. currency returned) ───────── */
@@ -351,7 +362,7 @@ function viewTripForm(){
   $('#rateLive').onclick=live;
   $('#rateBtn').onclick=()=>pickPhoto('gal',async f=>{try{rateShot=await compress(f,1200,.85);$('#rateThumb').style.backgroundImage=`url('${rateShot}')`}catch(e){toast(e.message)}});
   const ul=$('#useLeft');if(ul)ul.onclick=()=>{$('#fCardRet').value=Math.max(0,tt.cardLeft);$('#fCashRet').value=Math.max(0,tt.cashLeft)};
-  const del=$('#fDel');if(del)del.onclick=async()=>{if(!await ask('Delete "'+t.name+'"? Its sheet, photos and PDFs move to your Drive bin.','Delete',true))return;busy('Deleting…');try{S.trips=await run('deleteTrip',t.id);done();S.trip=null;toast('Trip deleted');go('home')}catch(e){done();toast(errMsg(e))}};
+  const del=$('#fDel');if(del)del.onclick=async()=>{if(!await ask('Delete "'+t.name+'"? Its sheet, photos and PDFs move to your Drive bin.','Delete',true))return;busy('Deleting…');try{S.trips=await run('deleteTrip',t.id);if(S.boot)cache.set('boot',Object.assign({},S.boot,{profile:S.profile,trips:S.trips}));done();S.trip=null;toast('Trip deleted');go('home')}catch(e){done();toast(errMsg(e))}};
   $('#fSave').onclick=async()=>{
     const v=sel.value,isOther=v==='other';
     const d={name:$('#fName').value.trim(),country:isOther?$('#fCountryOther').value.trim():(v!==''?COUNTRIES[+v][0]:''),
@@ -425,7 +436,7 @@ function viewTrip(){
         <div style="height:12px"></div>
         <button class="btn line" id="stmt">${ico('doc')} View statement</button>
         <div style="height:10px"></div>
-        <a class="btn line" href="${esc(t.sheetUrl)}" target="_blank">${ico('sheet')} Open Google Sheet</a>
+        ${S.sheet[t.id]==='ready'?`<a class="btn line" href="${esc(t.sheetUrl)}" target="_blank">${ico('sheet')} Open Google Sheet</a>`:`<button class="btn line" disabled><span class="spin"></span> Updating the Google Sheet…</button>`}
         <div style="height:10px"></div>
         <button class="btn line" id="stmtPdf">${ico('file')} Statement PDF</button>
         <div style="height:10px"></div>
@@ -445,6 +456,7 @@ function viewTrip(){
   const on=(id,f)=>{const el=$('#'+id);if(el)el.onclick=f};
   on('many',()=>pickMany(startQueue));
   on('cardSt',openCard);
+  if(S.tab==='submit')ensureSheet();
   on('stmt',()=>go('statement'));on('pdf',pdfMenu);on('ret',()=>go('tripForm'));on('stmtPdf',statementPdf);
   on('markSub',async()=>{const st=t.status==='Submitted'?'Active':'Submitted';busy('Updating…');try{setTrip(await run('updateTrip',t.id,{status:st}));done();toast(st==='Submitted'?'Marked as submitted':'Marked as active');viewTrip()}catch(e){done();toast(errMsg(e))}});
   document.querySelectorAll('.it[data-id]').forEach(el=>el.onclick=()=>{const b=S.bills.find(x=>x.id===el.dataset.id);S.draft=Object.assign({editing:true,editId:b.id},b);go('bill')});
@@ -519,7 +531,7 @@ function viewBill(){
 }
 
 async function useFile(d,f){
-  try{d.photo=await compress(f,1600,.82);d.thumb=await compress(f,160,.7);d.localUrl=d.photo;d.fullUrl=null}catch(e){return toast(e.message)}
+  try{d.photo=await compress(f,1400,.78);d.thumb=await compress(f,160,.7);d.localUrl=d.photo;d.fullUrl=null}catch(e){return toast(e.message)}
   if(S.view==='bill'&&S.draft===d)viewBill();
   readBill(d);
 }
@@ -581,7 +593,7 @@ async function deleteBill(){
 /* ───────── statement preview ───────── */
 function viewStatement(){
   const t=S.trip,p=S.profile,c=calc(t,S.bills);
-  head('statement',()=>go('trip'));fab('');
+  head('statement',()=>go('trip'));fab('');ensureSheet();
   const cashRate=Number(t.cashRate)||t.rate;
   const line=(no,name,amt,rate,inr)=>`<tr><td>${no}</td><td>${name}</td><td class="n">${amt}</td><td class="n">${rate}</td><td class="n">${inr}</td></tr>`;
   const block=(title,list,oop)=>{
@@ -707,9 +719,11 @@ function viewKey(){
 }
 async function boot(){
   if(!keyStore.get())return viewKey();
-  $('#app').innerHTML='<p class="mute" style="margin-top:24px"><span class="spin"></span> Loading your trips…</p>';
-  try{const b=await run('getBoot');S.boot=b;S.profile=b.profile;S.trips=b.trips;render()}
-  catch(e){if(e.code==='bad_key')return;$('#app').innerHTML=`<div class="card empty"><b>Could not start</b><p class="mute">${esc(errMsg(e))}</p><button class="btn line sm" id="retry">Try again</button>${e.code==='script'?`<a class="btn line sm" style="margin-top:10px" href="${API}" target="_blank">Test the script link</a><p class="mute" style="margin:8px 0 0">The test link should show one line: “Trip Expenses runs at …”. If it shows a sign-in page, the old app, or an error, the deployment needs the fix above.</p>`:''}</div>`;$('#retry').onclick=boot}
+  const c=cache.get('boot');
+  if(c){S.boot=c;S.profile=c.profile;S.trips=c.trips;render()}
+  else $('#app').innerHTML='<p class="mute" style="margin-top:24px"><span class="spin"></span> Loading your trips…</p>';
+  try{const b=await run('getBoot');S.boot=b;S.profile=b.profile;S.trips=b.trips;cache.set('boot',b);if(!c||S.view==='home')render()}
+  catch(e){if(e.code==='bad_key')return;if(c){toast('Showing saved copy. '+errMsg(e));return}$('#app').innerHTML=`<div class="card empty"><b>Could not start</b><p class="mute">${esc(errMsg(e))}</p><button class="btn line sm" id="retry">Try again</button>${e.code==='script'?`<a class="btn line sm" style="margin-top:10px" href="${API}" target="_blank">Test the script link</a><p class="mute" style="margin:8px 0 0">The test link should show one line: “Trip Expenses runs at …”. If it shows a sign-in page, the old app, or an error, the deployment needs the fix above.</p>`:''}</div>`;$('#retry').onclick=boot}
 }
 /* ───────── Android app: back button follows the app's own back arrow ───────── */
 (()=>{const C=window.Capacitor;const App=C&&C.Plugins&&C.Plugins.App;if(!App)return;

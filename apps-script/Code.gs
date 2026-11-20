@@ -55,7 +55,7 @@ function doGet() {
 const API_FNS = { getBoot: getBoot, saveProfile: saveProfile, getRate: getRate, getTrip: getTrip, createTrip: createTrip,
   updateTrip: updateTrip, deleteTrip: deleteTrip, readBill: readBill, saveBill: saveBill, deleteBill: deleteBill,
   getPhoto: getPhoto, exportStatement: exportStatement, generatePdf: generatePdf, uploadStatement: uploadStatement,
-  getStatement: getStatement, addFromStatement: addFromStatement };
+  getStatement: getStatement, addFromStatement: addFromStatement, refreshSheet: refreshSheet };
 
 /** API for the phone app: POST {key, fn, args}. Every call must carry the private APP_KEY. */
 function doPost(e) {
@@ -184,7 +184,7 @@ function createTrip(d) {
     writeRateProof_(ss, trip);
     const newRow = s.reg.getLastRow() + 1;   // write straight into the next free row (an empty appendRow is not counted)
     writeTrip_(newRow, trip);
-    render_(ss, trip, []);
+    render_(ss, trip, [], true);
     return { trip: clean_(tripRow_(id)), bills: [] };
   } finally { lock.releaseLock(); }
 }
@@ -211,7 +211,7 @@ function updateTrip(id, d) {
     writeTrip_(t._row, m);
     if (d.rateShot || d.rate !== undefined || d.rateSource !== undefined) writeRateProof_(ss, m);
     const bills = readLog_(ss);
-    render_(ss, m, bills);
+    m._row = t._row; registerTotals_(m, bills); markDirty_(id);
     return { trip: clean_(tripRow_(id)), bills: bills };
   } finally { lock.releaseLock(); }
 }
@@ -357,7 +357,7 @@ function saveBill(tripId, b) {
       b.payment, currency, amount, round_(rate, 5), '=ROUND(I' + row + '*J' + row + ',2)',
       photoUrl ? '=HYPERLINK("' + photoUrl + '","View bill")' : '', fileId, thumb, new Date()]]);
     const fresh = readLog_(ss);
-    render_(ss, t, fresh);
+    registerTotals_(t, fresh); markDirty_(tripId);
     return { billId: id, trip: clean_(tripRow_(tripId)), bills: fresh };
   } finally { lock.releaseLock(); }
 }
@@ -373,7 +373,7 @@ function deleteBill(tripId, billId) {
       ss.getSheetByName('Bill Log').deleteRow(b._row);
     }
     const fresh = readLog_(ss);
-    render_(ss, t, fresh);
+    registerTotals_(t, fresh); markDirty_(tripId);
     return { trip: clean_(tripRow_(tripId)), bills: fresh };
   } finally { lock.releaseLock(); }
 }
@@ -383,6 +383,24 @@ function getPhoto(fileId) {
   const b = DriveApp.getFileById(fileId).getBlob();
   return 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes());
 }
+
+/* ═════════════════════ company sheet refresh ═════════════════════ */
+
+/** Rebuilds the Expenses + Summary tabs from the Bill Log, only if something changed since the last rebuild. */
+function refreshSheet(tripId) {
+  if (!isDirty_(tripId)) return { updated: false };
+  const lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    const t = tripRow_(tripId);
+    const ss = SpreadsheetApp.openById(idFromUrl_(t.sheetUrl));
+    render_(ss, t, readLog_(ss));
+    clearDirty_(tripId);
+    return { updated: true };
+  } finally { lock.releaseLock(); }
+}
+function markDirty_(id) { props_().setProperty('DIRTY_' + id, '1'); }
+function clearDirty_(id) { props_().deleteProperty('DIRTY_' + id); }
+function isDirty_(id) { return props_().getProperty('DIRTY_' + id) === '1'; }
 
 /* ═════════════════════ forex card statement ═════════════════════ */
 
@@ -509,7 +527,7 @@ function addFromStatement(tripId, items) {
     });
     if (rows.length) log.getRange(log.getLastRow() + 1, 1, rows.length, LOG_H.length).setValues(rows);
     const fresh = readLog_(ss);
-    render_(ss, t, fresh);
+    registerTotals_(t, fresh); markDirty_(tripId);
     return { trip: clean_(tripRow_(tripId)), bills: fresh, statement: getStatement(tripId) };
   } finally { lock.releaseLock(); }
 }
@@ -520,7 +538,7 @@ function addFromStatement(tripId, items) {
 function exportStatement(tripId) {
   const t = tripRow_(tripId);
   const ss = SpreadsheetApp.openById(idFromUrl_(t.sheetUrl));
-  render_(ss, t, readLog_(ss));
+  if (isDirty_(tripId)) { render_(ss, t, readLog_(ss)); clearDirty_(tripId); }
   const hide = ['Bill Log', 'Rate Proof', 'Card Statement'].map(n => ss.getSheetByName(n)).filter(Boolean);
   hide.forEach(sh => sh.hideSheet());
   SpreadsheetApp.flush();
@@ -616,23 +634,25 @@ function grow_(sh, first, total, need) {
   if (need > cap) sh.insertRowsBefore(total - 1, need - cap + 2);
 }
 
-function render_(ss, t, bills) {
+function render_(ss, t, bills, fullFormat) {
   const sh = ss.getSheetByName('Expenses');
   const rate = Number(t.rate);
   const fx = k => bills.filter(b => b.payment !== 'Personal' && b.category === k);
   const g = { Hotel: fx('Hotel'), Food: fx('Food'), Other: fx('Other'), Transport: fx('Transport'), oop: bills.filter(b => b.payment === 'Personal') };
 
-  // make room (other first: its rows also widen hotel/food, then top, then bottom)
-  let L = layout_(sh);
-  grow_(sh, L.other.first, L.other.total, g.Other.length); L = layout_(sh);
-  grow_(sh, L.top.first, L.top.total, Math.max(g.Hotel.length, g.Food.length)); L = layout_(sh);
-  grow_(sh, L.bot.first, L.bot.total, Math.max(g.Transport.length, g.oop.length)); L = layout_(sh);
+  // make room only when a block is full (other first: its rows also widen hotel/food, then top, then bottom)
+  let L = layout_(sh), grew = !!fullFormat;
+  const need = [[L.other, g.Other.length], [L.top, Math.max(g.Hotel.length, g.Food.length)], [L.bot, Math.max(g.Transport.length, g.oop.length)]];
+  ['other', 'top', 'bot'].forEach((k, i) => {
+    const b = L[k], n = need[i][1];
+    if (n > b.total - b.first) { grow_(sh, b.first, b.total, n); grew = true; L = layout_(sh); }
+  });
 
-  block_(sh, L.top.first, L.top.total, 1, g.Hotel, t, false, 'sum');
-  block_(sh, L.top.first, L.top.total, 9, g.Food, t, false, 'sum');
-  block_(sh, L.other.first, L.other.total, 17, g.Other, t, false, 'mul');
-  block_(sh, L.bot.first, L.bot.total, 1, g.Transport, t, false, 'mul');
-  block_(sh, L.bot.first, L.bot.total, 9, g.oop, t, true, 'mul');
+  block_(sh, L.top.first, L.top.total, 1, g.Hotel, t, false, 'sum', grew);
+  block_(sh, L.top.first, L.top.total, 9, g.Food, t, false, 'sum', grew);
+  block_(sh, L.other.first, L.other.total, 17, g.Other, t, false, 'mul', grew);
+  block_(sh, L.bot.first, L.bot.total, 1, g.Transport, t, false, 'mul', grew);
+  block_(sh, L.bot.first, L.bot.total, 9, g.oop, t, true, 'mul', grew);
   summary_(ss, t, {
     hotel: 'E' + L.top.total, hotelInr: 'G' + L.top.total, food: 'M' + L.top.total, foodInr: 'O' + L.top.total,
     other: 'U' + L.other.total, otherInr: 'W' + L.other.total, taxi: 'E' + L.bot.total, taxiInr: 'G' + L.bot.total,
@@ -642,7 +662,7 @@ function render_(ss, t, bills) {
 }
 
 /** One block: SNO | DATE | PLACE | BILL NO | CURRENCY | CONV. RATE | INR, then the TOTAL row. */
-function block_(sh, first, total, c0, list, t, oop, totStyle) {
+function block_(sh, first, total, c0, list, t, oop, totStyle, formats) {
   const n = total - first;
   const A = col_(c0 + 4), R = col_(c0 + 5), I = col_(c0 + 6);
   const rows = [];
@@ -659,6 +679,8 @@ function block_(sh, first, total, c0, list, t, oop, totStyle) {
   }
   if (n > 0) {
     sh.getRange(first, c0, n, 7).setValues(rows);
+  }
+  if (n > 0 && formats) {
     sh.getRange(first, c0 + 1, n, 1).setNumberFormat('dd/mm/yyyy');
     sh.getRange(first, c0 + 4, n + 1, 1).setNumberFormat('0.00');
     sh.getRange(first, c0 + 5, n + 1, 1).setNumberFormat('0.000');
@@ -677,7 +699,10 @@ function summary_(ss, t, ref) {
   const p = profile_();
   const cashRate = Number(t.cashRate) || Number(t.rate);
   const nd = (t.start && t.end) ? Math.round((dateObj_(t.end) - dateObj_(t.start)) / 864e5) + 1 : '';
-  const put = (a, v) => s.getRange(a).setValue(v);
+  const R = s.getRange(1, 1, 52, 10);                       // A1:J52 in one read
+  const f = R.getFormulas(), v = R.getValues();
+  const grid = v.map((row, i) => row.map((x, j) => f[i][j] || x));
+  const put = (a1, val) => { const m = a1.match(/^([A-J])(\d+)$/); grid[+m[2] - 1][m[1].charCodeAt(0) - 65] = val; };
   put('C4', p.empName); put('G4', p.empNo);
   put('C5', t.country + (t.cities ? ' – ' + t.cities : ''));
   put('C7', "'" + dot_(t.start) + ' - ' + dot_(t.end));
@@ -689,7 +714,7 @@ function summary_(ss, t, ref) {
   put('E22', '=Expenses!' + ref.taxi); put('F22', '=F19'); put('G22', '=E22*F22');
   put('B25', '*'); put('E25', '=Expenses!' + ref.other); put('F25', '=F22'); put('G25', '=E25*F25');
   put('E29', '=Expenses!' + ref.oop); put('F29', 1); put('G29', '=E29*F29');
-  ['H16', 'J14', 'G20', 'I31', 'H49:I51'].forEach(a => s.getRange(a).clearContent());
+  ['H16', 'J14', 'G20', 'I31', 'H49', 'I49', 'H50', 'I50', 'H51', 'I51'].forEach(a => put(a, ''));
   put('G33', '=SUM(G15:G32)');
   put('G35', Number(t.tickets) || '');
   put('C40', Number(t.cardLoad) || 0); put('D40', '=F7');
@@ -699,6 +724,7 @@ function summary_(ss, t, ref) {
   put('D48', Number(t.cashReturned) || 0); put('E48', '=D41');
   put('G51', '=+G43-G33');
   put('G45', '=G51-SUM(F47:F48)');      // imprest − spent − currency returned (− = company owes you)
+  R.setValues(grid);                                        // one write
 }
 
 function writeRateProof_(ss, t) {
