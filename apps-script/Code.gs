@@ -388,15 +388,21 @@ function getPhoto(fileId) {
 
 /** Rebuilds the Expenses + Summary tabs from the Bill Log, only if something changed since the last rebuild. */
 function refreshSheet(tripId) {
-  if (!isDirty_(tripId)) return { updated: false };
   const lock = LockService.getScriptLock(); lock.waitLock(25000);
   try {
     const t = tripRow_(tripId);
     const ss = SpreadsheetApp.openById(idFromUrl_(t.sheetUrl));
-    render_(ss, t, readLog_(ss));
+    const bills = readLog_(ss);
+    if (!isDirty_(tripId) && props_().getProperty('LOGSIG_' + tripId) === logSig_(bills)) return { updated: false };
+    render_(ss, t, bills);
     clearDirty_(tripId);
     return { updated: true };
   } finally { lock.releaseLock(); }
+}
+/** Fingerprint of the Bill Log, so rows added or edited by hand (or imported) also trigger a rebuild. */
+function logSig_(bills) {
+  const raw = JSON.stringify(bills.map(b => [b.id, b.date, b.category, b.payment, b.vendor, b.description, b.currency, b.amount, b.rate, b.fileId]));
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw));
 }
 function markDirty_(id) { props_().setProperty('DIRTY_' + id, '1'); }
 function clearDirty_(id) { props_().deleteProperty('DIRTY_' + id); }
@@ -538,7 +544,7 @@ function addFromStatement(tripId, items) {
 function exportStatement(tripId) {
   const t = tripRow_(tripId);
   const ss = SpreadsheetApp.openById(idFromUrl_(t.sheetUrl));
-  if (isDirty_(tripId)) { render_(ss, t, readLog_(ss)); clearDirty_(tripId); }
+  { const bills = readLog_(ss); if (isDirty_(tripId) || props_().getProperty('LOGSIG_' + tripId) !== logSig_(bills)) { render_(ss, t, bills); clearDirty_(tripId); } }
   const hide = ['Bill Log', 'Rate Proof', 'Card Statement'].map(n => ss.getSheetByName(n)).filter(Boolean);
   hide.forEach(sh => sh.hideSheet());
   SpreadsheetApp.flush();
@@ -658,6 +664,7 @@ function render_(ss, t, bills, fullFormat) {
     other: 'U' + L.other.total, otherInr: 'W' + L.other.total, taxi: 'E' + L.bot.total, taxiInr: 'G' + L.bot.total,
     oop: 'M' + L.bot.total, oopInr: 'O' + L.bot.total });
   registerTotals_(t, bills);
+  if (t.id) props_().setProperty('LOGSIG_' + t.id, logSig_(bills));
   SpreadsheetApp.flush();
 }
 
