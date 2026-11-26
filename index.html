@@ -25,7 +25,7 @@
   --red:#ff7a6e;--ok:#5fd39a;--warn:#f2b456;--shadow:none;
   --t-Hotel:#2b1d1b;--c-Hotel:#ff8a75;--t-Food:#2b2418;--c-Food:#f3b25b;
   --t-Transport:#17222f;--c-Transport:#6fa8ff;--t-Other:#16271e;--c-Other:#5fd39a;
-  --t-Personal:#231c30;--c-Personal:#b694ff}
+  --t-Personal:#231c30;--c-Personal:#b694ff;--t-Own:#2e2616;--c-Own:#e9c46a}
 :root[data-theme=light],:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Outfit",system-ui,sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased}
@@ -63,6 +63,8 @@ input.i:focus,select.i:focus{outline:2px solid var(--teal2);border-color:transpa
 .tile.Hotel{background:var(--t-Hotel);color:var(--c-Hotel)}.tile.Food{background:var(--t-Food);color:var(--c-Food)}
 .tile.Transport{background:var(--t-Transport);color:var(--c-Transport)}.tile.Other{background:var(--t-Other);color:var(--c-Other)}
 .tile.Personal{background:var(--t-Personal);color:var(--c-Personal)}
+.tile.Own{background:var(--t-Own);color:var(--c-Own)}
+.ownnote{margin-top:8px;font-size:14px;padding:10px 12px;border-radius:14px;background:var(--t-Own);color:var(--c-Own)}
 .trip{display:block;width:100%;padding:0;border:0;text-align:left;cursor:pointer;overflow:hidden}
 .trip .top{padding:18px 16px;background:linear-gradient(140deg,#1e7a58,#155c43);color:#fff}.trip .top .mute{color:rgba(255,255,255,.7)}
 .trip .code{font-size:30px;font-weight:700;letter-spacing:.02em;line-height:1}
@@ -156,7 +158,8 @@ html.kb-open #toast{bottom:calc(var(--kb) + 16px)}
 /* ───────── reference data ───────── */
 const COUNTRIES=[["United Kingdom","GBR","GBP"],["United States","USA","USD"],["Germany","DEU","EUR"],["France","FRA","EUR"],["Italy","ITA","EUR"],["Spain","ESP","EUR"],["Netherlands","NLD","EUR"],["Belgium","BEL","EUR"],["Austria","AUT","EUR"],["Portugal","PRT","EUR"],["Ireland","IRL","EUR"],["Greece","GRC","EUR"],["Finland","FIN","EUR"],["Switzerland","CHE","CHF"],["Sweden","SWE","SEK"],["Norway","NOR","NOK"],["Denmark","DNK","DKK"],["Poland","POL","PLN"],["Czech Republic","CZE","CZK"],["Hungary","HUN","HUF"],["Turkey","TUR","TRY"],["United Arab Emirates","ARE","AED"],["Saudi Arabia","SAU","SAR"],["Qatar","QAT","QAR"],["Oman","OMN","OMR"],["Bahrain","BHR","BHD"],["Kuwait","KWT","KWD"],["Japan","JPN","JPY"],["China","CHN","CNY"],["South Korea","KOR","KRW"],["Taiwan","TWN","TWD"],["Hong Kong","HKG","HKD"],["Singapore","SGP","SGD"],["Malaysia","MYS","MYR"],["Thailand","THA","THB"],["Indonesia","IDN","IDR"],["Vietnam","VNM","VND"],["Philippines","PHL","PHP"],["Sri Lanka","LKA","LKR"],["Nepal","NPL","NPR"],["Bangladesh","BGD","BDT"],["Maldives","MDV","MVR"],["Australia","AUS","AUD"],["New Zealand","NZL","NZD"],["Canada","CAN","CAD"],["Mexico","MEX","MXN"],["Brazil","BRA","BRL"],["Argentina","ARG","ARS"],["Colombia","COL","COP"],["South Africa","ZAF","ZAR"],["Egypt","EGY","EGP"],["Kenya","KEN","KES"],["Nigeria","NGA","NGN"],["Morocco","MAR","MAD"],["Israel","ISR","ILS"],["Russia","RUS","RUB"],["Kazakhstan","KAZ","KZT"]];
 const CUR_NAMES={GBP:'POUNDS',EUR:'EUROS',USD:'US DOLLARS',JPY:'YEN',AED:'DIRHAMS',SGD:'SINGAPORE DOLLARS',CHF:'SWISS FRANCS',AUD:'AUSTRALIAN DOLLARS',CNY:'YUAN',THB:'BAHT',IDR:'RUPIAH',MYR:'RINGGIT',CAD:'CANADIAN DOLLARS',KRW:'WON',VND:'DONG',SAR:'RIYALS',QAR:'RIYALS',NZD:'NZ DOLLARS',SEK:'KRONA',NOK:'KRONE',DKK:'KRONE'};
-const SECS=[{k:'Hotel',label:'Hotel'},{k:'Food',label:'Food'},{k:'Transport',label:'Taxi / Train / Bus'},{k:'Other',label:'Other'}];
+const SECS=[{k:'Hotel',label:'Hotel'},{k:'Food',label:'Food'},{k:'Transport',label:'Taxi / Train / Bus'},{k:'Other',label:'Other'},{k:'Own',label:'Own (not claimed)'}];
+const CLAIM=['Hotel','Food','Transport','Other'];
 const PAYS=[{k:'Card',label:'Forex card'},{k:'Cash',label:'Forex cash'},{k:'Personal',label:'Personal'}];
 const secLabel=k=>(SECS.find(s=>s.k===k)||SECS[3]).label;
 const payLabel=k=>(PAYS.find(p=>p.k===k)||{label:k}).label;
@@ -166,13 +169,14 @@ const IC={Hotel:'<path d="M3 19v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 15h18M7 10
  Food:'<path d="M7 3v18M5 3v5a2 2 0 0 0 4 0V3M17 21V3c-2 1.5-3 4-3 7h3"/>',
  Transport:'<path d="M5 17V10l2-5h10l2 5v7M5 17h14M5 17v2M19 17v2M5 10h14M8 14h.01M16 14h.01"/>',
  Other:'<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 7.5h.01"/>',
+ Own:'<path d="M6 8h12l-1 12H7L6 8zM9 8a3 3 0 0 1 6 0"/>',
  Personal:'<path d="M3 7a2 2 0 0 1 2-2h12v4M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2zM16 14h.01"/>',
  cam:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
  img:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',doc:'<path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/>',file:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
  sheet:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>',refresh:'<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>'};
 const ico=(k,sz=18)=>`<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]||''}</svg>`;
-const tileKey=b=>b.payment==='Personal'?'Personal':(SECS.some(s=>s.k===b.category)?b.category:'Other');
+const tileKey=b=>b.category==='Own'?'Own':b.payment==='Personal'?'Personal':(SECS.some(s=>s.k===b.category)?b.category:'Other');
 const tile=(k,cls='')=>`<span class="tile ${k} ${cls}">${ico(k,cls?20:18)}</span>`;
 
 /* ───────── helpers ───────── */
@@ -215,14 +219,16 @@ function setTrip(r,fromCache){if(!fromCache){cache.set('trip_'+r.trip.id,{trip:r
 
 /* ───────── maths ───────── */
 function calc(trip,bills){
-  const t={sec:{Hotel:{amt:0,inr:0,n:0},Food:{amt:0,inr:0,n:0},Transport:{amt:0,inr:0,n:0},Other:{amt:0,inr:0,n:0}},oop:{inr:0,n:0},pay:{Card:0,Cash:0,Personal:0},cardLocal:0,cashLocal:0,total:0};
+  const t={sec:{Hotel:{amt:0,inr:0,n:0},Food:{amt:0,inr:0,n:0},Transport:{amt:0,inr:0,n:0},Other:{amt:0,inr:0,n:0},Own:{amt:0,inr:0,n:0}},oop:{inr:0,n:0},own:{inr:0,n:0},pay:{Card:0,Cash:0,Personal:0},cardLocal:0,cashLocal:0,total:0};
   bills.forEach(b=>{const inr=r2(b.amount*b.rate);
+    if(b.payment==='Card'&&b.currency===trip.currency)t.cardLocal+=b.amount;
+    if(b.payment==='Cash'&&b.currency===trip.currency)t.cashLocal+=b.amount;
+    if(b.category==='Own'){t.own.inr+=inr;t.own.n++;t.sec.Own.inr+=inr;t.sec.Own.n++;return}
     if(b.payment==='Personal'){t.oop.inr+=inr;t.oop.n++}
     else{const s=t.sec[b.category]||t.sec.Other;s.amt+=b.currency===trip.currency?b.amount:r2(inr/(trip.rate||1));s.inr+=inr;s.n++}
     t.pay[b.payment]=(t.pay[b.payment]||0)+inr;
-    if(b.payment==='Card'&&b.currency===trip.currency)t.cardLocal+=b.amount;
-    if(b.payment==='Cash'&&b.currency===trip.currency)t.cashLocal+=b.amount;
     t.total+=inr});
+  t.own.inr=r2(t.own.inr);
   const cashRate=Number(trip.cashRate)||Number(trip.rate);
   t.cardLeft=r2((Number(trip.cardLoad)||0)-t.cardLocal);t.cashLeft=r2((Number(trip.cashTaken)||0)-t.cashLocal);
   t.imprest=r2((Number(trip.cardLoad)||0)*trip.rate+(Number(trip.cashTaken)||0)*cashRate);
@@ -393,18 +399,18 @@ function viewTrip(){
   if(S.day&&!dayTotals[S.day])S.day=null;
   const shown=S.bills.slice().reverse().filter(b=>!S.day||b.date===S.day);
   const short=v=>v>=100000?(v/100000).toFixed(1)+'L':v>=1000?(v/1000).toFixed(1)+'k':Math.round(v);
-  const cats=SECS.map(s=>({k:s.k,label:s.label,n:c.sec[s.k].n,inr:c.sec[s.k].inr})).concat([{k:'Personal',label:'Out of pocket',n:c.oop.n,inr:c.oop.inr}]);
+  const cats=CLAIM.map(k=>({k,label:secLabel(k),n:c.sec[k].n,inr:c.sec[k].inr})).concat([{k:'Personal',label:'Out of pocket',n:c.oop.n,inr:c.oop.inr}]);
   const billRow=b=>`
       <button class="it" data-id="${esc(b.id)}">
         <span class="thumb" style="${b.thumb?`background-image:url('${b.thumb}')`:''}">${b.thumb?tile(tileKey(b)):`<span class="tile ${tileKey(b)}" style="position:static;width:44px;height:44px;border-radius:14px;border:0">${ico(tileKey(b),20)}</span>`}</span>
         <span class="m"><span class="nm">${esc(b.vendor||secLabel(b.category))}</span>
-          <span class="sub">${/^No bill available/.test(b.description)?'No bill · card statement':(b.payment==='Personal'?'Out of pocket':secLabel(b.category))+' · '+payLabel(b.payment)}${b.time?' · '+esc(b.time):''}</span></span>
+          <span class="sub">${b.category==='Own'?'Own · not claimed · '+payLabel(b.payment):/^No bill available/.test(b.description)?'No bill · card statement':(b.payment==='Personal'?'Out of pocket':secLabel(b.category))+' · '+payLabel(b.payment)}${b.time?' · '+esc(b.time):''}</span></span>
         <span class="amt"><b class="money">${esc(b.currency)} ${n2(b.amount)}</b><span class="mute money">₹ ${n2(b.amount*b.rate)}</span></span>
       </button>`;
   $('#app').innerHTML=`
     <div class="strip">
       <div class="row" style="align-items:center"><span class="lbl">${esc(t.country)} · ${dmy(t.start)}${t.end?' – '+dmy(t.end):''}</span><span class="lbl" style="flex:none">1 ${esc(t.currency)} = ₹${esc(t.rate)}</span></div>
-      <div class="lbl" style="margin-top:10px">total spent</div><div class="tot money">₹ ${n2(c.total)}</div>
+      <div class="lbl" style="margin-top:10px">total to claim</div><div class="tot money">₹ ${n2(c.total)}</div>${c.own.n?`<div class="lbl" style="margin-top:4px">+ ₹ ${n2(c.own.inr)} own purchases, not claimed</div>`:''}
       <div class="stats">
         <div><b>${S.bills.length}</b><span>bills</span></div>
         <div><b>${nd}</b><span>days</span></div>
@@ -428,7 +434,9 @@ function viewTrip(){
       <div class="card list">${cats.map(x=>{const pct=c.total?Math.round(x.inr/c.total*100):0;return `
         <div class="it" style="cursor:default">${tile(x.k)}<span class="m"><span class="nm">${x.label}</span><span class="sub">${x.n} bill${x.n===1?'':'s'}</span><div class="bar2"><i style="width:${pct}%;background:var(--c-${x.k})"></i></div></span>
         <span class="amt"><b class="money">₹ ${n2(x.inr)}</b></span><span class="pct">${pct}%</span></div>`}).join('')}</div>
-      <div class="card list">${PAYS.map(p=>`<div class="it" style="cursor:default"><span class="m"><span class="nm">${p.label}</span></span><span class="amt"><b class="money">₹ ${n2(c.pay[p.k]||0)}</b></span></div>`).join('')}</div>`
+      <div class="card list">${PAYS.map(p=>`<div class="it" style="cursor:default"><span class="m"><span class="nm">${p.label}</span></span><span class="amt"><b class="money">₹ ${n2(c.pay[p.k]||0)}</b></span></div>`).join('')}</div>
+      <h2>own purchases</h2>
+      <div class="card list"><div class="it" style="cursor:default">${tile('Own')}<span class="m"><span class="nm">Own (not claimed)</span><span class="sub">${c.own.n} item${c.own.n===1?'':'s'} · kept out of the claim, shown separately in the sheet</span></span><span class="amt"><b class="money">₹ ${n2(c.own.inr)}</b></span></div></div>`
     :`
       <div class="card">
         <b>Ready to submit?</b>
@@ -484,6 +492,7 @@ function viewBill(){
     <div class="chips" id="payChips">${PAYS.map(p=>`<button class="chip plain ${d.payment===p.k?'on':''}" data-v="${p.k}">${p.label}</button>`).join('')}</div>
     <div id="inrBox" style="display:none"><label class="f">₹ actually charged to you<input class="i" id="bInr" type="number" inputmode="decimal" step="any" value="${d.payment==='Personal'&&d.amount?esc(r2(d.amount*d.rate)):''}"></label><p class="mute" style="margin:6px 0 0">Goes to Out of pocket, in rupees.</p></div>
     <p class="form-title">Section</p>
+    <div id="ownNote"></div>
     <div class="chips" id="secChips">${SECS.map(s=>`<button class="chip ${d.category===s.k?'on':''}" data-v="${s.k}">${tile(s.k)}${s.label}</button>`).join('')}</div>
     <div class="grid2">
       <label class="f">Date<input class="i" id="bDate" type="date" value="${esc(d.date)}"></label>
@@ -516,7 +525,8 @@ function viewBill(){
   ['bAmt','bCur','bRate','bDate','bTime','bVendor','bDesc','bInr'].forEach(id=>$('#'+id).addEventListener('input',sync));
   const chips=(id,key,after)=>document.querySelectorAll('#'+id+' .chip').forEach(c=>c.onclick=()=>{d[key]=c.dataset.v;document.querySelectorAll('#'+id+' .chip').forEach(x=>x.classList.toggle('on',x===c));after&&after()});
   chips('payChips','payment',()=>{if(d.payment==='Personal')prefillInr();sync()});
-  chips('secChips','category');
+  const ownNote=()=>{$('#ownNote').innerHTML=d.category==='Own'?'<div class="ownnote">Own purchase: logged and shown in a separate personal block in the sheet, but not added to the claim or the bills PDF.</div>':''};
+  chips('secChips','category',ownNote);ownNote();
   sync();
   if(d.needRate){d.needRate=false;curChanged()}
 
@@ -601,6 +611,7 @@ function viewStatement(){
     const sa=list.reduce((s,b)=>s+(oop?r2(b.amount*b.rate):(b.currency===t.currency?b.amount:r2(b.amount*b.rate/t.rate))),0),si=list.reduce((s,b)=>s+r2(b.amount*b.rate),0);
     return `<h2>${title}</h2><div class="card scroll" style="padding:8px 12px"><table style="min-width:560px"><thead><tr><th>SNO</th><th>DATE</th><th>PLACE</th><th>BILL NO</th><th class="n">CURRENCY</th><th class="n">CONV. RATE</th><th class="n">INR</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="mute">No bills</td></tr>'}<tr class="tot"><td colspan="4">TOTAL MENTIONED IN SUMMARY SHEET</td><td class="n">${n2(sa)}</td><td class="n">${oop?'1.000':Number(t.rate).toFixed(3)}</td><td class="n">${n2(si)}</td></tr></tbody></table></div>`};
   const fx=k=>S.bills.filter(b=>b.payment!=='Personal'&&b.category===k);
+  const ownList=S.bills.filter(b=>b.category==='Own');
   $('#app').innerHTML=`
     <p class="mute" style="margin-top:8px">This is what your Google Sheet shows. <a href="${esc(t.sheetUrl)}" target="_blank" style="color:var(--ok)">Open the sheet</a></p>
     <div class="card">
@@ -621,6 +632,7 @@ function viewStatement(){
       ${line(5,'Other exp',n2(c.sec.Other.amt),Number(t.rate).toFixed(3),n2(c.sec.Other.inr))}
       ${line(8,'Out of pocket',n2(c.oop.inr),'1.000',n2(c.oop.inr))}
       <tr class="tot"><td></td><td colspan="3">Total expenses paid</td><td class="n">${n2(c.total)}</td></tr>
+      <tr><td></td><td colspan="3">Own purchases (not claimed, for info)</td><td class="n">${n2(c.own.inr)}</td></tr>
       <tr><td></td><td colspan="3">Air ticket / insurance paid by company</td><td class="n">${t.tickets?n2(t.tickets):'—'}</td></tr>
     </tbody></table></div>
     <div class="card scroll"><b>Imprest details</b><table style="min-width:420px;margin-top:6px"><thead><tr><th>Foreign currency taken</th><th class="n">Currency</th><th class="n">Conv. rate</th><th class="n">INR</th></tr></thead><tbody>
@@ -634,7 +646,7 @@ function viewStatement(){
       <tr class="tot"><td colspan="3">Amount due to company</td><td class="n">${n2(c.due)}</td></tr>
     </tbody></table>
     <p class="mute" style="margin:8px 0 0">${c.due<0?'Negative: the company owes you ₹ '+n2(-c.due)+'.':c.due>0?'Positive: you owe the company ₹ '+n2(c.due)+'.':'Settled.'}</p></div>
-    ${block('hotel expenses',fx('Hotel'))}${block('food expenses',fx('Food'))}${block('other expenses',fx('Other'))}${block('taxi / train / bus expenses',fx('Transport'))}${block('out of pocket',S.bills.filter(b=>b.payment==='Personal'),true)}`;
+    ${block('hotel expenses',fx('Hotel'))}${block('food expenses',fx('Food'))}${block('other expenses',fx('Other'))}${block('taxi / train / bus expenses',fx('Transport'))}${block('out of pocket',S.bills.filter(b=>b.payment==='Personal'&&b.category!=='Own'),true)}${block('personal purchases (not claimed)',ownList.filter(b=>b.payment!=='Personal'&&b.currency!=='INR'))}${ownList.some(b=>b.payment==='Personal'||b.currency==='INR')?block('personal purchases in rupees (not claimed)',ownList.filter(b=>b.payment==='Personal'||b.currency==='INR'),true):''}`;
 }
 
 /* ───────── forex card statement ───────── */
@@ -693,11 +705,12 @@ function pdfReady(r,label){
 async function statementPdf(){busy('Making the statement PDF…');try{const r=await run('exportStatement',S.trip.id);done();pdfReady(r,'Statement PDF')}catch(e){done();toast(errMsg(e))}}
 function pdfMenu(){
   if(!S.bills.length)return toast('No bills yet');
-  const cnt=k=>S.bills.filter(b=>b.payment===k).length;
+  const claim=S.bills.filter(b=>b.category!=='Own');const cnt=k=>claim.filter(b=>b.payment===k).length;const own=S.bills.length-claim.length;
   modal(`<b style="font-size:18px">bills PDF</b><p class="mute" style="margin:4px 0 12px">Cover with totals, the rate screenshot, then one bill per page.</p>
-    <button class="btn" data-m="all">All bills · ${S.bills.length}</button>
+    <button class="btn" data-m="all">All claim bills · ${claim.length}</button>
     <div class="grid2" style="margin-top:10px"><button class="btn line sm" data-m="Card">Forex card · ${cnt('Card')}</button><button class="btn line sm" data-m="Cash">Forex cash · ${cnt('Cash')}</button></div>
     <button class="btn line sm" data-m="Personal" style="margin-top:10px">Out of pocket · ${cnt('Personal')}</button>
+    ${own?`<button class="btn line sm" data-m="Own" style="margin-top:10px">Own purchases (not claimed) · ${own}</button>`:''}
     <button class="btn line sm" id="mClose" style="margin-top:10px;background:none">Cancel</button>`);
   $('#mClose').onclick=closeModal;
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{const m=b.dataset.m;busy('Building the PDF… (about 2 s per bill)');try{const r=await run('generatePdf',S.trip.id,m);done();pdfReady(r,'Bills PDF')}catch(e){done();toast(errMsg(e))}});

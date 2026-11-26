@@ -15,7 +15,9 @@
  */
 
 const TEMPLATE_ID_DEFAULT = '1W9GJYAj_oX5qPM0BoVFDn-dtWptXRgOXEBGg97q6V08';
-const SECS = { Hotel: 'H', Food: 'F', Transport: 'T', Other: 'O' };
+const SECS = { Hotel: 'H', Food: 'F', Transport: 'T', Other: 'O', Own: 'P' };
+/** Sections that go into the claim. 'Own' = personal purchases (e.g. shoes on the forex card): logged and shown, never claimed. */
+const CLAIM_SECS = ['Hotel', 'Food', 'Transport', 'Other'];
 const PAYS = ['Card', 'Cash', 'Personal'];
 const CUR_NAMES = { GBP: 'POUNDS', EUR: 'EUROS', USD: 'US DOLLARS', JPY: 'YEN', AED: 'DIRHAMS', SGD: 'SINGAPORE DOLLARS',
   CHF: 'SWISS FRANCS', AUD: 'AUSTRALIAN DOLLARS', CNY: 'YUAN', THB: 'BAHT', IDR: 'RUPIAH', MYR: 'RINGGIT', CAD: 'CANADIAN DOLLARS',
@@ -28,7 +30,7 @@ const REG_H = ['Trip ID', 'Trip Name', 'Country', 'Code', 'Cities', 'Start Date'
   'Rate (INR)', 'Rate Source', 'Card Load', 'Cash Taken', 'Cash Rate', 'Card Returned', 'Cash Returned', 'Tickets by Company (INR)',
   'Hotel (INR)', 'Food (INR)', 'Transport (INR)', 'Other (INR)', 'Out of Pocket (INR)', 'Forex Card (INR)', 'Forex Cash (INR)',
   'Personal (INR)', 'Total (INR)', 'Bills', 'Status', 'Trip Sheet', 'Folder', 'Rate File ID', 'Last Bills PDF',
-  'Last Statement PDF', 'Created', 'Card Statement File ID'];
+  'Last Statement PDF', 'Created', 'Card Statement File ID', 'Own Purchases (INR)'];
 const REG_KEY = { 'Trip ID': 'id', 'Trip Name': 'name', 'Country': 'country', 'Code': 'code', 'Cities': 'cities',
   'Start Date': 'start', 'End Date': 'end', 'Purpose': 'purpose', 'Currency': 'currency', 'Rate (INR)': 'rate',
   'Rate Source': 'rateSource', 'Card Load': 'cardLoad', 'Cash Taken': 'cashTaken', 'Cash Rate': 'cashRate',
@@ -36,9 +38,9 @@ const REG_KEY = { 'Trip ID': 'id', 'Trip Name': 'name', 'Country': 'country', 'C
   'Hotel (INR)': 'hotel', 'Food (INR)': 'food', 'Transport (INR)': 'transport', 'Other (INR)': 'other',
   'Out of Pocket (INR)': 'oop', 'Forex Card (INR)': 'card', 'Forex Cash (INR)': 'cash', 'Personal (INR)': 'personal',
   'Total (INR)': 'totalInr', 'Bills': 'billCount', 'Status': 'status', 'Trip Sheet': 'sheetUrl', 'Folder': 'folderUrl',
-  'Rate File ID': 'rateFileId', 'Last Bills PDF': 'pdfUrl', 'Last Statement PDF': 'statementUrl', 'Created': 'createdAt', 'Card Statement File ID': 'stmtFileId' };
+  'Rate File ID': 'rateFileId', 'Last Bills PDF': 'pdfUrl', 'Last Statement PDF': 'statementUrl', 'Created': 'createdAt', 'Card Statement File ID': 'stmtFileId', 'Own Purchases (INR)': 'own' };
 const NUM_KEYS = ['rate', 'cardLoad', 'cashTaken', 'cashRate', 'cardReturned', 'cashReturned', 'tickets', 'hotel', 'food',
-  'transport', 'other', 'oop', 'card', 'cash', 'personal', 'totalInr', 'billCount', 'createdAt'];
+  'transport', 'other', 'oop', 'card', 'cash', 'personal', 'totalInr', 'billCount', 'createdAt', 'own'];
 const EDITABLE = ['name', 'country', 'code', 'cities', 'start', 'end', 'purpose', 'currency', 'rate', 'rateSource',
   'cardLoad', 'cashTaken', 'cashRate', 'cardReturned', 'cashReturned', 'tickets', 'status'];
 
@@ -297,7 +299,7 @@ function readBill(dataUrl, currency) {
       'payment: Card if card/VISA/Mastercard/contactless/auth code shown, Cash if cash/change shown, else Unknown. confidence for the amount.';
     const out = gemini_([{ text: prompt }, { inline_data: { mime_type: m[1], data: m[2] } }], { type: 'OBJECT',
       properties: { date: { type: 'STRING' }, time: { type: 'STRING' }, vendor: { type: 'STRING' }, description: { type: 'STRING' },
-        amount: { type: 'NUMBER' }, currency: { type: 'STRING' }, category: { type: 'STRING', enum: Object.keys(SECS) },
+        amount: { type: 'NUMBER' }, currency: { type: 'STRING' }, category: { type: 'STRING', enum: CLAIM_SECS },
         payment: { type: 'STRING', enum: ['Card', 'Cash', 'Unknown'] }, confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] } },
       required: ['amount', 'currency', 'category'] });
     out.ok = true;
@@ -438,7 +440,7 @@ function parseStatement_(dataUrl, cur) {
       transactions: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
         date: { type: 'STRING' }, description: { type: 'STRING' }, amount: { type: 'NUMBER' }, currency: { type: 'STRING' },
         type: { type: 'STRING', enum: ['purchase', 'atm', 'fee', 'load', 'refund', 'other'] },
-        section: { type: 'STRING', enum: Object.keys(SECS) } }, required: ['date', 'description', 'amount', 'type'] } } },
+        section: { type: 'STRING', enum: CLAIM_SECS } }, required: ['date', 'description', 'amount', 'type'] } } },
       required: ['transactions'] });
   } catch (e) {
     const c = String(e.message || e);
@@ -565,11 +567,12 @@ function generatePdf(tripId, mode) {
   const t = tripRow_(tripId);
   const ss = SpreadsheetApp.openById(idFromUrl_(t.sheetUrl));
   const all = readLog_(ss);
-  const bills = mode && mode !== 'all' ? all.filter(b => b.payment === mode) : all;
+  const bills = mode === 'Own' ? all.filter(b => b.category === 'Own')
+    : all.filter(b => b.category !== 'Own' && (!mode || mode === 'all' || b.payment === mode));
   if (!bills.length) throw new Error('No bills in this group');
   const p = profile_();
-  const label = { all: 'All bills', Card: 'Forex card bills', Cash: 'Forex cash bills', Personal: 'Out-of-pocket bills' }[mode || 'all'];
-  const sec = b => b.payment === 'Personal' ? 'Out of pocket' : (b.category === 'Transport' ? 'Taxi / Train / Bus' : b.category);
+  const label = { all: 'All claim bills', Card: 'Forex card bills', Cash: 'Forex cash bills', Personal: 'Out-of-pocket bills', Own: 'Own purchases (not claimed)' }[mode || 'all'];
+  const sec = b => b.category === 'Own' ? 'Own (not claimed)' : b.payment === 'Personal' ? 'Out of pocket' : (b.category === 'Transport' ? 'Taxi / Train / Bus' : b.category);
   const payL = k => ({ Card: 'Forex card', Cash: 'Forex cash', Personal: 'Personal' })[k] || k;
 
   const doc = DocumentApp.create(tripId + ' · ' + label);
@@ -584,7 +587,7 @@ function generatePdf(tripId, mode) {
   bills.forEach(b => { const k = sec(b); g[k] = g[k] || { n: 0, inr: 0 }; g[k].n++; g[k].inr += b.inr; tot += b.inr; });
   body.appendParagraph('Totals').setHeading(H.HEADING2);
   const rows = [['Section', 'Bills', 'Amount (INR)']];
-  ['Hotel', 'Food', 'Taxi / Train / Bus', 'Other', 'Out of pocket'].forEach(k => { if (g[k]) rows.push([k, String(g[k].n), fmt_(g[k].inr)]); });
+  ['Hotel', 'Food', 'Taxi / Train / Bus', 'Other', 'Out of pocket', 'Own (not claimed)'].forEach(k => { if (g[k]) rows.push([k, String(g[k].n), fmt_(g[k].inr)]); });
   rows.push(['TOTAL', String(bills.length), fmt_(tot)]);
   grid_(body, rows, 10);
   body.appendParagraph('Bill index').setHeading(H.HEADING2);
@@ -644,11 +647,12 @@ function render_(ss, t, bills, fullFormat) {
   const sh = ss.getSheetByName('Expenses');
   const rate = Number(t.rate);
   const fx = k => bills.filter(b => b.payment !== 'Personal' && b.category === k);
-  const g = { Hotel: fx('Hotel'), Food: fx('Food'), Other: fx('Other'), Transport: fx('Transport'), oop: bills.filter(b => b.payment === 'Personal') };
+  const g = { Hotel: fx('Hotel'), Food: fx('Food'), Other: fx('Other'), Transport: fx('Transport'),
+    oop: bills.filter(b => b.payment === 'Personal' && b.category !== 'Own'), own: bills.filter(b => b.category === 'Own') };
 
   // make room only when a block is full (other first: its rows also widen hotel/food, then top, then bottom)
   let L = layout_(sh), grew = !!fullFormat;
-  const need = [[L.other, g.Other.length], [L.top, Math.max(g.Hotel.length, g.Food.length)], [L.bot, Math.max(g.Transport.length, g.oop.length)]];
+  const need = [[L.other, g.Other.length], [L.top, Math.max(g.Hotel.length, g.Food.length)], [L.bot, Math.max(g.Transport.length, g.oop.length, g.own.length)]];
   ['other', 'top', 'bot'].forEach((k, i) => {
     const b = L[k], n = need[i][1];
     if (n > b.total - b.first) { grow_(sh, b.first, b.total, n); grew = true; L = layout_(sh); }
@@ -659,16 +663,50 @@ function render_(ss, t, bills, fullFormat) {
   block_(sh, L.other.first, L.other.total, 17, g.Other, t, false, 'mul', grew);
   block_(sh, L.bot.first, L.bot.total, 1, g.Transport, t, false, 'mul', grew);
   block_(sh, L.bot.first, L.bot.total, 9, g.oop, t, true, 'mul', grew);
+  ownBlock_(sh, L.bot.first, L.bot.total, g.own, t, grew);
   summary_(ss, t, {
     hotel: 'E' + L.top.total, hotelInr: 'G' + L.top.total, food: 'M' + L.top.total, foodInr: 'O' + L.top.total,
     other: 'U' + L.other.total, otherInr: 'W' + L.other.total, taxi: 'E' + L.bot.total, taxiInr: 'G' + L.bot.total,
-    oop: 'M' + L.bot.total, oopInr: 'O' + L.bot.total });
+    oop: 'M' + L.bot.total, oopInr: 'O' + L.bot.total, ownInr: 'W' + L.bot.total });
   registerTotals_(t, bills);
   if (t.id) props_().setProperty('LOGSIG_' + t.id, logSig_(bills));
   SpreadsheetApp.flush();
 }
 
 /** One block: SNO | DATE | PLACE | BILL NO | CURRENCY | CONV. RATE | INR, then the TOTAL row. */
+/** Own purchases (not claimed): same columns as the other blocks, in Q–W beside Out of pocket. */
+function ownBlock_(sh, first, total, list, t, formats) {
+  const c0 = 17;
+  sh.getRange(first - 2, c0, 2, 7).setValues([['PERSONAL PURCHASES (NOT CLAIMED)', '', '', '', '', '', ''],
+    ['SNO', 'DATE', 'PLACE', 'BILL NO', 'CURRENCY', 'CONV. RATE', 'INR']]);
+  sh.getRange(total, c0, 1, 4).setValues([['TOTAL – NOT INCLUDED IN THE CLAIM', '', '', '']]);
+  // paid personally in rupees → amount in INR at rate 1; otherwise in trip currency at the trip rate
+  const rows = [];
+  for (let i = 0; i < total - first; i++) {
+    const r = first + i, b = list[i];
+    const inrF = '=U' + r + '*V' + r;
+    if (!b) { rows.push([i + 1, '', '', '', '', '=Summary!$F$7', inrF]); continue; }
+    const inrMode = b.payment === 'Personal' || b.currency === 'INR';
+    let amt = inrMode ? b.inr : (b.currency === t.currency ? b.amount : round_(b.inr / Number(t.rate), 2));
+    let place = b.vendor + (b.description ? ' – ' + b.description : '') + ' [' + (b.payment === 'Card' ? 'forex card' : b.payment === 'Cash' ? 'forex cash' : 'own money') + ']';
+    if (!inrMode && b.currency !== t.currency) place += ' (' + b.currency + ' ' + fmt_(b.amount) + ')';
+    rows.push([i + 1, b.date ? dateObj_(b.date) : '', place, b.photoUrl ? '=HYPERLINK("' + b.photoUrl + '","' + b.id + '")' : b.id, amt, inrMode ? 1 : '=Summary!$F$7', inrF]);
+  }
+  if (rows.length) sh.getRange(first, c0, rows.length, 7).setValues(rows);
+  sh.getRange(total, c0 + 4, 1, 3).setValues([['=SUM(U' + first + ':U' + (total - 1) + ')', '', '=SUM(W' + first + ':W' + (total - 1) + ')']]);
+  if (formats) {
+    sh.getRange(first - 2, c0, 1, 7).merge().setFontWeight('bold').setHorizontalAlignment('center').setBackground('#f4e3c7');
+    sh.getRange(first - 1, c0, 1, 7).setFontWeight('bold').setBackground('#f2f2f2').setHorizontalAlignment('center');
+    sh.getRange(total, c0, 1, 7).setFontWeight('bold');
+    sh.getRange(first - 2, c0, total - first + 3, 7).setBorder(true, true, true, true, true, true, '#999999', SpreadsheetApp.BorderStyle.SOLID);
+    sh.getRange(first, c0 + 1, total - first, 1).setNumberFormat('dd/mm/yyyy');
+    sh.getRange(first, c0 + 4, total - first + 1, 1).setNumberFormat('0.00');
+    sh.getRange(first, c0 + 5, total - first + 1, 1).setNumberFormat('0.000');
+    sh.getRange(first, c0 + 6, total - first + 1, 1).setNumberFormat('0.00');
+    sh.setColumnWidth(c0 + 2, 260); sh.setColumnWidth(c0 + 3, 190);
+  }
+}
+
 function block_(sh, first, total, c0, list, t, oop, totStyle, formats) {
   const n = total - first;
   const A = col_(c0 + 4), R = col_(c0 + 5), I = col_(c0 + 6);
@@ -682,7 +720,7 @@ function block_(sh, first, total, c0, list, t, oop, totStyle, formats) {
     else if (b.currency === t.currency) amt = b.amount;
     else { amt = round_(b.inr / Number(t.rate), 2); place += ' (' + b.currency + ' ' + fmt_(b.amount) + ')'; }
     const billNo = b.photoUrl ? '=HYPERLINK("' + b.photoUrl + '","' + b.id + '")' : b.id;
-    rows.push([i + 1, dateObj_(b.date), place, billNo, amt, oop ? 1 : '=Summary!$F$7', inrF]);
+    rows.push([i + 1, b.date ? dateObj_(b.date) : '', place, billNo, amt, oop ? 1 : '=Summary!$F$7', inrF]);
   }
   if (n > 0) {
     sh.getRange(first, c0, n, 7).setValues(rows);
@@ -730,6 +768,7 @@ function summary_(ss, t, ref) {
   put('D47', Number(t.cardReturned) || 0); put('E47', '=D40');
   put('D48', Number(t.cashReturned) || 0); put('E48', '=D41');
   put('G51', '=+G43-G33');
+  put('B37', 'PERSONAL PURCHASES ON FOREX / OWN (NOT CLAIMED, FOR INFO)'); put('G37', '=Expenses!' + ref.ownInr);
   put('G45', '=G51-SUM(F47:F48)');      // imprest − spent − currency returned (− = company owes you)
   R.setValues(grid);                                        // one write
 }
@@ -755,8 +794,9 @@ function writeRateProof_(ss, t) {
 /* ═════════════════════ register & log ═════════════════════ */
 
 function registerTotals_(t, bills) {
-  const tt = { hotel: 0, food: 0, transport: 0, other: 0, oop: 0, card: 0, cash: 0, personal: 0, total: 0 };
+  const tt = { hotel: 0, food: 0, transport: 0, other: 0, oop: 0, card: 0, cash: 0, personal: 0, total: 0, own: 0 };
   bills.forEach(b => {
+    if (b.category === 'Own') { tt.own += b.inr; return; }
     if (b.payment === 'Personal') tt.oop += b.inr; else tt[b.category.toLowerCase()] += b.inr;
     tt[b.payment.toLowerCase()] += b.inr; tt.total += b.inr;
   });
@@ -765,6 +805,7 @@ function registerTotals_(t, bills) {
   const c = REG_H.indexOf('Hotel (INR)') + 1;
   reg.getRange(row, c, 1, 10).setValues([[round_(tt.hotel, 2), round_(tt.food, 2), round_(tt.transport, 2), round_(tt.other, 2),
     round_(tt.oop, 2), round_(tt.card, 2), round_(tt.cash, 2), round_(tt.personal, 2), round_(tt.total, 2), bills.length]]);
+  reg.getRange(row, REG_H.indexOf('Own Purchases (INR)') + 1).setValue(round_(tt.own, 2));
 }
 
 function readLog_(ss) {
